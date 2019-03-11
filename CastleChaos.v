@@ -99,17 +99,54 @@ module CastleChaos
 	 
 	 //instantiate blank checker board
 	 DrawBoard board();
-	 
+	 DrawBox box();
+	 DrawBlue();
+	 DrawYellowx();
 	 
 endmodule
 
 
-
-module DrawBoard();
+module DrawBox();
+// this module can draw a box of any size based on input. Largest box we may need is 25x25,
+// so the pixel counter size never needs more than 6 bits
 	
+	input [2:0] colour_in;
+	input [5:0] pixel_counter;
+	input clk;
+	input reset_n;
+	input [7:0] start_x;
+	input [6:0] start_y;
 	
+	output reg [7:0] x_pos;
+	output reg [6:0] y_pos;
+	output [2:0] colour_out;
+	
+	assign colour_out = colour_in;
+	
+	reg [7:0] reg_x; 
+	reg [6:0] reg_y;
+	
+	always@(posedge clk) begin
+		if (!reset_n) begin
+			x_pos <= 8'b00000000;
+			y_pos <= 7'b0000000;
+			x_pos <= start_x + {5'b00000, pixel_counter[2:0]}; // We use pixel_counter[2:0] as x offset
+			y_pos <= start_y + {4'b0000, pixel_counter[5:3]}; // We use pixel_counter[5:3] as y offset
+		end
 	
 endmodule
+
+
+module DrawBoard();	
+
+	// locations of white grid boards (x,y):
+	//		([56:80], [11:35]);		([106:130], [11:35]);		([31:55], [36:60]);		([81:105], [36:60]);
+	//		([56:80], [61:85]);		([106:130], [61:85]);		([31:55], [86:110]);		([81:105], [86:110]);
+
+endmodule
+
+
+
 
 
 
