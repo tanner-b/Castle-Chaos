@@ -85,28 +85,16 @@ module CastleChaos
 	 
 	 											//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~??
 		
-    // Instansiate datapath
-	data_path d0(.x_pos(x), .y_pos(y), .colour_out(colour), .clk(CLOCK_50), .colour_in(SW[9:7]), 
-					 .load_val(SW[6:0]), .load_x(load_x), .load_y(load_y), .pixel_counter(pixel_offsets), .reset_n(resetn));
-
-    // Instansiate FSM control
-    FSM controller(.go(KEY[3]), .ResetN(resetn), .LoadX(load_x), .LoadY(load_y), .increment(pixel_offsets), .draw(writeEn), .clk(CLOCK_50));
-    
-	 
-	 
-	 
-	 
-	 
+  
 	 //instantiate blank checker board
 	 DrawBoard board();
-	 DrawBox box();
-	 DrawBlue();
-	 DrawYellowx();
+	 DrawGrid box();
+	 
 	 
 endmodule
 
 
-module DrawBox();
+module DrawGrid();
 // this module can draw a box of any size based on input. Largest box we may need is 25x25,
 // so the pixel counter size never needs more than 6 bits
 	
@@ -133,15 +121,15 @@ module DrawBox();
 			x_pos <= start_x + {5'b00000, pixel_counter[2:0]}; // We use pixel_counter[2:0] as x offset
 			y_pos <= start_y + {4'b0000, pixel_counter[5:3]}; // We use pixel_counter[5:3] as y offset
 		end
-	
 endmodule
+
 
 
 module DrawBoard();	
 
 	// locations of white grid boards (x,y):
 	//		([56:80], [11:35]);		([106:130], [11:35]);		([31:55], [36:60]);		([81:105], [36:60]);
-	//		([56:80], [61:85]);		([106:130], [61:85]);		([31:55], [86:110]);		([81:105], [86:110]);
+	//		([56:80], [61:85]);		([106:130], [61:85]);		([31:55], [86:110]);	([81:105], [86:110]);
 
 endmodule
 
