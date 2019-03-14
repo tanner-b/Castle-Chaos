@@ -32,7 +32,6 @@ module CastleChaos
 	
 	wire resetn;
 	assign resetn = SW[17];
-											//~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~??
 	
 	// wires for passing in the coordinates and colour of the pixel to be drawn
 	wire [2:0] colour;
@@ -266,5 +265,312 @@ endmodule
 
 
 	// locations of white grid boards (x,y):
-	//		([56:80], [11:35]);		([106:130], [11:35]);		([31:55], [36:60]);		([81:105], [36:60]);
+	//		([56:80], [11:35]); 	([106:130], [11:35]);		([31:55], [36:60]);		([81:105], [36:60]);
 	//		([56:80], [61:85]);		([106:130], [61:85]);		([31:55], [86:110]);	([81:105], [86:110]);
+
+module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_out, done_p, done_s, selector, direction, clk, reset);
+
+	input [3:0] selector; // Changes the cell the selector is on
+	input [3:0] direction; // Tries to move the selected peice up, down, left, right
+	input done_p, done_s; // Signals for when the other fsm's are done thier drawing.
+	input clk, reset; // Clk is clock, and reset resets.
+	
+	output reg load_p, load_s; // The signals given to the piece_drawer_fsm and selector_drawer_fsm
+	output reg [7:0] x_out; // X and Y are the top left corner of what ever we want to draw
+	output reg [6:0] y_out;
+	output [2:0] colour1_out, colour2_out; // Two colour outputs used by the drawers.
+	
+	reg [2:0] curr_state = RESET;
+	reg [2:0] next_state = DRAW_BOARD;
+	reg player_turn = 0;
+	reg player_input = 2'b00;
+	
+	// Registers for holding the board information
+	// Each cell is 3 bits, and thus a 4x4 board.
+	// bit[2] -> 0 : black, 1 : white;
+	// bits[1:0] -> 00 : black, 10 : white, 01 : blue, 11 : yellow;
+	reg [47:0] cells; 
+	
+	assign player_has_input = direction[0] | direction[1] | direction[2] | direction[3];
+	
+	parameter RESET = 3'b000, DRAW_BOARD_0 = 3'b001, WAIT_BOARD_0 = 3'b010, DRAW_SELECTOR = 3'b011, 
+			  WAIT_SELECTOR_DONE = 3'b100, WAIT_PLAYER = 3'b101, DO_LOGIC = 3'b110;
+	
+	// State changing logic		  
+	always@(*) begin
+		case (curr_state)
+			RESET: next_state = reset ? RESET : DRAW_BOARD; 
+			DRAW_BOARD_0: next_state = WAIT_BOARD_0;
+			WAIT_BOARD_0: next_state = done_p ? DRAW_BOARD_1 : WAIT_BOARD_0;
+			DRAW_BOARD_1: next_state = WAIT_BOARD_1;
+			WAIT_BOARD_1: next_state = done_p ? DRAW_BOARD_2 : WAIT_BOARD_1;
+			DRAW_BOARD_2: next_state = WAIT_BOARD_2;
+			WAIT_BOARD_2: next_state = done_p ? DRAW_BOARD_3 : WAIT_BOARD_2;
+			DRAW_BOARD_3: next_state = WAIT_BOARD_3;
+			WAIT_BOARD_3: next_state = done_p ? DRAW_BOARD_4 : WAIT_BOARD_3;
+			DRAW_BOARD_4: next_state = WAIT_BOARD_4;
+			WAIT_BOARD_4: next_state = done_p ? DRAW_BOARD_5 : WAIT_BOARD_4;
+			DRAW_BOARD_5: next_state = WAIT_BOARD_5;
+			WAIT_BOARD_5: next_state = done_p ? DRAW_BOARD_6 : WAIT_BOARD_5;
+			DRAW_BOARD_6: next_state = WAIT_BOARD_6;
+			WAIT_BOARD_6: next_state = done_p ? DRAW_BOARD_7 : WAIT_BOARD_6;
+			DRAW_BOARD_7: next_state = WAIT_BOARD_7;
+			WAIT_BOARD_7: next_state = done_p ? DRAW_BOARD_8 : WAIT_BOARD_7;
+			DRAW_BOARD_8: next_state = WAIT_BOARD_8;
+			WAIT_BOARD_8: next_state = done_p ? DRAW_BOARD_9 : WAIT_BOARD_8;
+			DRAW_BOARD_9: next_state = WAIT_BOARD_9;
+			WAIT_BOARD_9: next_state = done_p ? DRAW_BOARD_10 : WAIT_BOARD_9;
+			DRAW_BOARD_10: next_state = WAIT_BOARD_10;
+			WAIT_BOARD_10: next_state = done_p ? DRAW_BOARD_11 : WAIT_BOARD_10;
+			DRAW_BOARD_11: next_state = WAIT_BOARD_11;
+			WAIT_BOARD_11: next_state = done_p ? DRAW_BOARD_12 : WAIT_BOARD_11;
+			DRAW_BOARD_12: next_state = WAIT_BOARD_12;
+			WAIT_BOARD_12: next_state = done_p ? DRAW_BOARD_13 : WAIT_BOARD_12;
+			DRAW_BOARD_13: next_state = WAIT_BOARD_13;
+			WAIT_BOARD_13: next_state = done_p ? DRAW_BOARD_14 : WAIT_BOARD_13;
+			DRAW_BOARD_14: next_state = WAIT_BOARD_14;
+			WAIT_BOARD_14: next_state = done_p ? DRAW_BOARD_15 : WAIT_BOARD_14;
+			DRAW_BOARD_15: next_state = WAIT_BOARD_15;
+			WAIT_BOARD_15: next_state = done_p ? WAIT_PLAYER : WAIT_BOARD_15;
+			
+			DRAW_SELECTOR: next_state = WAIT_SELECTOR_DONE;
+			WAIT_SELECTOR_DONE: next_state = done_s ? WAIT_PLAYER : WAIT_SELECTOR_DONE;
+			WAIT_PLAYER: next_state = player_has_input ? DO_LOGIC : WAIT_PLAYER;
+			DO_LOGIC: next_state = DRAW_BOARD;
+		endcase
+	end
+	
+	always@(posedge clk)
+	begin: state_table
+		case (curr_state)	
+		
+			RESET: 
+			begin
+				cells = {3'b001, 3'b111, 3'b000, 3'b110,
+                         3'b101, 3'b000, 3'b111, 3'b010,
+                         3'b001, 3'b111, 3'b000, 3'b110,
+                         3'b101, 3'b000, 3'b111, 3'b010};
+				load_p <= 1'b0;
+				load_s <= 1'b0;
+				x_out <= 8'b00000000;
+				y_out <= 7'b0000000;
+			end
+						
+			DRAW_BOARD_0: begin
+				bg_colour_decoder(cells[2:0], colour1_out);
+				fg_colour_decoder(cells[2:0], colour2_out);
+				load_p <= 1'b1;
+				x_out <= 8'b00001010;
+				y_out <= 7'b0011110;
+			end
+			WAIT_BOARD_0: begin 
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_1: begin
+				bg_colour_decoder(cells[5:3], colour1_out);
+				fg_colour_decoder(cells[5:3], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b00110111;
+				y_out <= 7'b0001011;
+			end
+			WAIT_BOARD_1: begin
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_2: begin 
+				bg_colour_decoder(cells[8:6], colour1_out);
+				fg_colour_decoder(cells[8:6], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b01010000;
+				y_out <= 7'b0001011;
+			end
+			WAIT_BOARD_2: begin
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_3: begin
+				bg_colour_decoder(cells[11:9], colour1_out);
+				fg_colour_decoder(cells[11:9], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b01101001;
+				y_out <= 7'b0001011;
+			end
+			WAIT_BOARD_3: begin
+				load_p = 1'b0;			
+			end
+			DRAW_BOARD_4: begin
+				bg_colour_decoder(cells[14:12], colour1_out);
+				fg_colour_decoder(cells[14:12], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b00011110;
+				y_out <= 7'b0100011;
+			end
+			WAIT_BOARD_4: begin
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_5: begin 
+				bg_colour_decoder(cells[17:15], colour1_out);
+				fg_colour_decoder(cells[17:15], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b00110111;
+				y_out <= 7'b0100011;
+			end
+			WAIT_BOARD_5: begin
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_6: begin
+				bg_colour_decoder(cells[20:18], colour1_out);
+				fg_colour_decoder(cells[20:18], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b01010000;
+				y_out <= 7'b0100011;
+			end
+			WAIT_BOARD_6: begin
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_7: begin
+				bg_colour_decoder(cells[23:21], colour1_out);
+				fg_colour_decoder(cells[23:21], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b01101001;
+				y_out <= 7'b0100011;
+			end
+			WAIT_BOARD_7: begin 
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_8: begin
+				bg_colour_decoder(cells[26:24], colour1_out);
+				fg_colour_decoder(cells[26:24], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b00001110;
+				y_out <= 7'b0111100;
+			end
+			WAIT_BOARD_8: begin
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_9: begin
+				bg_colour_decoder(cells[29:27], colour1_out);
+				fg_colour_decoder(cells[29:27], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b00110111;
+				y_out <= 7'b0111100;
+			end
+			WAIT_BOARD_9: begin
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_10: begin
+				bg_colour_decoder(cells[32:30], colour1_out);
+				fg_colour_decoder(cells[32:30], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b01010000;
+				y_out <= 7'b0111100;
+			end
+			WAIT_BOARD_10: begin 
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_11: begin
+				bg_colour_decoder(cells[35:33], colour1_out);
+				fg_colour_decoder(cells[35:33], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b01101001;
+				y_out <= 7'b0111100;
+			end
+			WAIT_BOARD_11: begin
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_12: begin 
+				bg_colour_decoder(cells[38:36], colour1_out);
+				fg_colour_decoder(cells[38:36], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b00011110;
+				y_out <= 7'b1010101;
+			end
+			WAIT_BOARD_12: begin
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_13: begin
+				bg_colour_decoder(cells[41:39], colour1_out);
+				fg_colour_decoder(cells[41:39], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b00110111;
+				y_out <= 7'b1010101;
+			end
+			WAIT_BOARD_13: begin
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_14: begin
+				bg_colour_decoder(cells[44:42], colour1_out);
+				fg_colour_decoder(cells[44:42], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b01010000;
+				y_out <= 7'b1010101;
+			end
+			WAIT_BOARD_14: begin
+				load_p = 1'b0;
+			end
+			DRAW_BOARD_15: begin
+				bg_colour_decoder(cells[47:45], colour1_out);
+				fg_colour_decoder(cells[47:45], colour2_out);			
+				load_p = 1'b1;
+				x_out <= 8'b01101001;
+				y_out <= 7'b1010101;
+			end
+			WAIT_BOARD_15: begin
+				load_p = 1'b0;
+			end
+			
+			DRAW_SELECTOR:
+				
+				
+			WAIT_SELECTOR_DONE:
+			
+			WAIT_PLAYER:
+			
+			DO_LOGIC:
+
+			default:
+				next_state = RESET;
+				
+		endcase
+	end
+	
+	always @(posedge clk) begin
+		if(reset == 1'b0)
+			next_state = RESET; // Should restart
+		curr_state = next_state;
+	end	
+
+endmodule
+
+module bg_colour_decoder(cell_data, colour);
+
+	input [2:0] cell_data;
+	output reg [2:0] colour;
+	
+	case (cell_data)
+		// White
+		3'b111, 3'b101, 3'b110:
+			colour = 3'b111;
+		// Black
+		3'b000, 3'b001, 3'b010, default:
+			colour = 3'b000;
+	endcase
+endmodule
+
+module fg_colour_decoder(cell_data, colour);
+	input [2:0] cell_data;
+	output  reg [2:0] colour;
+	
+	case (cell_data)
+		// White
+		3'b111:
+			colour = 3'b111;
+		// Blue
+		3'b001, 3'b101:
+			colour = 3'b001;
+		// Yellow
+		3'b010, 3'b110:
+			colour = 3'110;
+		// Black
+		3'b000, default:
+			colour = 3'b000
+	endcase
+endmodule	
