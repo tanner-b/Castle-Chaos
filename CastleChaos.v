@@ -12,7 +12,11 @@ module CastleChaos
 		VGA_SYNC_N,						//	VGA SYNC
 		VGA_R,   						//	VGA Red[9:0]
 		VGA_G,	 						//	VGA Green[9:0]
-		VGA_B   						//	VGA Blue[9:0]
+		VGA_B,
+		HEX0,
+		HEX1,
+		HEX4,
+		HEX5//	VGA Blue[9:0]
 	);
 
 	input			CLOCK_50;				//	50 MHz
@@ -29,6 +33,7 @@ module CastleChaos
 	output	[9:0]	VGA_R;   				//	VGA Red[9:0]
 	output	[9:0]	VGA_G;	 				//	VGA Green[9:0]
 	output	[9:0]	VGA_B;   				//	VGA Blue[9:0]
+	output [6:0] HEX0, HEX1, HEX4, HEX5;
 	
 	wire resetn;
 	assign resetn = SW[17];
@@ -61,6 +66,23 @@ module CastleChaos
 		defparam VGA.MONOCHROME = "FALSE";
 		defparam VGA.BITS_PER_COLOUR_CHANNEL = 1;
 		defparam VGA.BACKGROUND_IMAGE = "black.mif";
+		
+		wire load_p, load_s;
+		wire done_p, done_s;
+		wire [7:0] start_x;
+		wire [6:0] start_y;
+		wire [2:0] colour_1, colour_2;
+		wire writeEn;
+		wire [5:0] state;
+		
+		// instantiate all the modules we wrote for this game
+		Draw_Grid_FSM grid_drawer(.clk(CLOCK_50), .done(done_p), .load_p(load_p), .reset(~resetn), .start_x(start_x), .start_y(start_y), .bg_colour(colour_1), .fg_colour(colour_2), .x_pos(x), .y_pos(y), .colour_out(colour), .draw(writeEn));
+		//Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .start_x(start_x), .start_y(start_y), .colour_in(colour_1), .done(done_s), .x_pos(x), .y_pos(y), .colour_out(colour), .draw(writeEn));
+		game_controller_fsm main(.load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(colour_1), .colour2_out(colour_2), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(KEY[3:0]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state));
+		hex_decoder hex0 (.hex_digit(start_x[3:0]), .segments(HEX0));
+		hex_decoder hex1 (.hex_digit(start_y[3:0]), .segments(HEX1));
+		hex_decoder hex4 (.hex_digit(state[3:0]), .segments(HEX4));
+		hex_decoder hex5 (.hex_digit({2'b00, state[5:4]}), .segments(HEX5));
 			
 endmodule
 	 
@@ -80,12 +102,12 @@ endmodule
 //	|				|
 //	+---------------+
 
-module Draw_Grid_FSM(clk, done, draw, reset, start_x, start_y, bg_colour, fg_colour, x_pos, y_pos, colour_out);
+module Draw_Grid_FSM(clk, done, load_p, reset, start_x, start_y, bg_colour, fg_colour, x_pos, y_pos, colour_out, draw);
 // this module can draw a box of any size based on input. Largest box we may need is 25x25,
 // so the pixel counter size never needs more than 6 bits
 
 	input clk;
-	input draw;
+	input load_p;
 	input reset;
 
 	input [7:0] start_x;
@@ -97,6 +119,7 @@ module Draw_Grid_FSM(clk, done, draw, reset, start_x, start_y, bg_colour, fg_col
 	output reg [7:0] x_pos;
 	output reg [6:0] y_pos;
 	output reg [2:0] colour_out;
+	output reg draw;
 
 	// this signals when the module finished drawing the current grid to the screen
 	output reg done = 1'b0;
@@ -105,15 +128,15 @@ module Draw_Grid_FSM(clk, done, draw, reset, start_x, start_y, bg_colour, fg_col
 	reg [4:0] x_incr;
 	reg [4:0] y_incr;
 	
-	reg curr_state = WAIT;
-	reg next_state = WAIT;
+	reg [1:0] curr_state = WAIT;	
+	reg [1:0] next_state = WAIT;
 	reg wait_one_cycle;
 	parameter WAIT = 2'b00, INCREMENT = 2'b01, DONE = 2'b11;
 
 	// this determines the next state
 	always@(*) begin
 		case(curr_state)
-			WAIT: next_state = draw ? INCREMENT : WAIT;
+			WAIT: next_state = load_p ? INCREMENT : WAIT;
 			// if both x and y counter reached 0, we are done drawing the grid
 			INCREMENT: next_state = ((x_incr == 5'b00000) && (y_incr == 5'b00000)) ? DONE : INCREMENT;
 			DONE: next_state = WAIT;
@@ -133,10 +156,14 @@ module Draw_Grid_FSM(clk, done, draw, reset, start_x, start_y, bg_colour, fg_col
 
 			INCREMENT: begin
 				done <= 1'b0;
-				x_pos <= start_x + {5'b00000, x_incr[4:0]};
-				y_pos <= start_y + {4'b0000, y_incr[4:0]}; 
+				x_pos <= start_x + {3'b000, x_incr[4:0]};
+				y_pos <= start_y + {2'b00, y_incr[4:0]}; 
 
-				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
+				if (wait_one_cycle == 1'b1) begin
+					wait_one_cycle = 1'b0;
+					draw <= 1'b0;
+				end
+				
 				else begin
 					// go through first row of x, then second row, ... etc
 					if (x_incr == 5'b00000) begin
@@ -148,7 +175,10 @@ module Draw_Grid_FSM(clk, done, draw, reset, start_x, start_y, bg_colour, fg_col
 				// logic for colour_out: if 5<= x,y <= 19 => drawing fg, else drawing bg
 				if ((x_incr >= 5'b00101) && (x_incr <= 5'b10011) && (y_incr >= 5'b00101) && (y_incr <= 5'b10011))
 					colour_out <= fg_colour;
+					//colour_out <= 3'b100;
 				else colour_out <= bg_colour;
+				//colour_out <= 3'b010;
+				draw <= 1'b1;
 			end
 
 			DONE: done <= 1'b1;
@@ -167,11 +197,11 @@ endmodule
 
 // selector will draw inside of a given grid. The thickness of the boarder will be one pixel wide
 
-module Selector_Drawer_FSM(clk, reset, draw, start_x, start_y, colour_in, done, x_pos, y_pos, colour_out);
+module Selector_Drawer_FSM(clk, reset, load_s, start_x, start_y, colour_in, done, x_pos, y_pos, colour_out, draw);
 
 	input clk;
 	input reset;
-	input draw;
+	input load_s;
 	input [7:0] start_x;
 	input [6:0] start_y;
 	input [2:0] colour_in;
@@ -181,6 +211,7 @@ module Selector_Drawer_FSM(clk, reset, draw, start_x, start_y, colour_in, done, 
 	output reg [6:0] y_pos;
 	output [2:0] colour_out;
 	assign colour_out = colour_in;
+	output reg draw;
 
 
 	// this signals when the module finished drawing the current grid to the screen
@@ -198,7 +229,7 @@ module Selector_Drawer_FSM(clk, reset, draw, start_x, start_y, colour_in, done, 
 	// this determines the next state
 	always@(*) begin
 		case(curr_state)
-			WAIT: next_state = draw ? TOP_BOARDER : WAIT;
+			WAIT: next_state = load_s ? TOP_BOARDER : WAIT;
 			// X counter reached 0, Y stayed at 25
 			BOTTOM_BOARDER: next_state = ((x_incr == 5'b00000) && (y_incr == 5'b11001)) ? RIGHT_BOARDER : TOP_BOARDER;
 			// Y counter reached 0, X stayed at 0
@@ -226,6 +257,7 @@ module Selector_Drawer_FSM(clk, reset, draw, start_x, start_y, colour_in, done, 
 				// each counter starts at 25: boarder is drawn on the interior pixel of a single grid
 				x_incr <= 5'b11001;
 				y_incr <= 5'b11001;
+				draw <= 1'b0;
 			end
 
 			BOTTOM_BOARDER: begin
@@ -233,6 +265,7 @@ module Selector_Drawer_FSM(clk, reset, draw, start_x, start_y, colour_in, done, 
 				y_pos <= start_y + {4'b0000, y_incr[4:0]}; 
 				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
 				else x_incr <= x_incr - 5'b0001;
+				draw <= 1'b1;
 			end
 
 			LEFT_BOARDER: begin
@@ -240,6 +273,7 @@ module Selector_Drawer_FSM(clk, reset, draw, start_x, start_y, colour_in, done, 
 				y_pos <= start_y + {4'b0000, y_incr[4:0]}; 
 				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
 				else y_incr <= y_incr - 5'b0001;
+				draw <= 1'b1;
 			end
 
 			TOP_BOARDER: begin
@@ -247,6 +281,7 @@ module Selector_Drawer_FSM(clk, reset, draw, start_x, start_y, colour_in, done, 
 				y_pos <= start_y + {4'b0000, y_incr[4:0]}; 
 				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
 				else x_incr <= x_incr + 5'b0001;
+				draw <= 1'b1;
 			end
 
 			RIGHT_BOARDER: begin
@@ -254,6 +289,7 @@ module Selector_Drawer_FSM(clk, reset, draw, start_x, start_y, colour_in, done, 
 				y_pos <= start_y + {4'b0000, y_incr[4:0]}; 
 				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
 				else y_incr <= y_incr + 5'b0001;
+				draw <= 1'b1;
 			end
 
 			DONE: next_state = WAIT;
@@ -268,7 +304,7 @@ endmodule
 	//		([56:80], [11:35]); 	([106:130], [11:35]);		([31:55], [36:60]);		([81:105], [36:60]);
 	//		([56:80], [61:85]);		([106:130], [61:85]);		([31:55], [86:110]);	([81:105], [86:110]);
 
-module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_out, done_p, done_s, selector, direction, clk, reset);
+module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_out, done_p, done_s, selector, direction, clk, reset, hex_state);
 
 	input [3:0] selector; // Changes the cell the selector is on
 	input [3:0] direction; // Tries to move the selected peice up, down, left, right
@@ -279,11 +315,14 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 	output reg [7:0] x_out; // X and Y are the top left corner of what ever we want to draw
 	output reg [6:0] y_out;
 	output [2:0] colour1_out, colour2_out; // Two colour outputs used by the drawers.
+	output reg [5:0] hex_state;
 	
-	reg [2:0] curr_state = RESET;
-	reg [2:0] next_state = DRAW_BOARD;
-	reg player_turn = 0;
-	reg player_input = 2'b00;
+	reg [2:0] fg_colour, bg_colour;
+	//reg player_turn = 0;
+	//reg player_input = 2'b00;
+	
+	fg_colour_decoder myfg (.cell_data(fg_colour), .colour(colour2_out));
+	bg_colour_decoder mybg (.cell_data(bg_colour), .colour(colour1_out));
 	
 	// Registers for holding the board information
 	// Each cell is 3 bits, and thus a 4x4 board.
@@ -291,15 +330,36 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 	// bits[1:0] -> 00 : black, 10 : white, 01 : blue, 11 : yellow;
 	reg [47:0] cells; 
 	
-	assign player_has_input = direction[0] | direction[1] | direction[2] | direction[3];
+	//assign player_has_input = direction[0] | direction[1] | direction[2] | direction[3];
 	
-	parameter RESET = 3'b000, DRAW_BOARD_0 = 3'b001, WAIT_BOARD_0 = 3'b010, DRAW_SELECTOR = 3'b011, 
-			  WAIT_SELECTOR_DONE = 3'b100, WAIT_PLAYER = 3'b101, DO_LOGIC = 3'b110;
+	parameter RESET = 6'b000000, 
+	DRAW_BOARD_0 = 6'b000001, WAIT_BOARD_0 = 6'b000010,
+	DRAW_BOARD_1 = 6'b000011, WAIT_BOARD_1 = 6'b000100,	
+	DRAW_BOARD_2 = 6'b000101, WAIT_BOARD_2 = 6'b000110,
+	DRAW_BOARD_3 = 6'b000111, WAIT_BOARD_3 = 6'b001000,	
+	DRAW_BOARD_4 = 6'b001001, WAIT_BOARD_4 = 6'b001010,
+	DRAW_BOARD_5 = 6'b001011, WAIT_BOARD_5 = 6'b001100,	
+	DRAW_BOARD_6 = 6'b001101, WAIT_BOARD_6 = 6'b001110,
+	DRAW_BOARD_7 = 6'b001111, WAIT_BOARD_7 = 6'b010000,	
+	DRAW_BOARD_8 = 6'b010001, WAIT_BOARD_8 = 6'b010010,
+	DRAW_BOARD_9 = 6'b010011, WAIT_BOARD_9 = 6'b010100,	
+	DRAW_BOARD_10 = 6'b010101, WAIT_BOARD_10 = 6'b010110,
+	DRAW_BOARD_11 = 6'b010111, WAIT_BOARD_11 = 6'b011000,	
+	DRAW_BOARD_12 = 6'b011001, WAIT_BOARD_12 = 6'b011010,
+	DRAW_BOARD_13 = 6'b011011, WAIT_BOARD_13 = 6'b011100,	
+	DRAW_BOARD_14 = 6'b011101, WAIT_BOARD_14 = 6'b011110,
+	DRAW_BOARD_15 = 6'b011111, WAIT_BOARD_15 = 6'b100000,	
+	DRAW_SELECTOR = 6'b100001, 
+			  WAIT_SELECTOR_DONE = 6'b100010, WAIT_PLAYER = 6'b100011, DO_LOGIC = 6'b100100;
+	reg [5:0] curr_state = RESET;
+	reg [5:0] next_state = DRAW_BOARD_0;		  
+	
+			  
 	
 	// State changing logic		  
 	always@(*) begin
 		case (curr_state)
-			RESET: next_state = reset ? RESET : DRAW_BOARD; 
+			RESET: next_state = reset ? RESET : DRAW_BOARD_0; 
 			DRAW_BOARD_0: next_state = WAIT_BOARD_0;
 			WAIT_BOARD_0: next_state = done_p ? DRAW_BOARD_1 : WAIT_BOARD_0;
 			DRAW_BOARD_1: next_state = WAIT_BOARD_1;
@@ -335,9 +395,12 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 			
 			DRAW_SELECTOR: next_state = WAIT_SELECTOR_DONE;
 			WAIT_SELECTOR_DONE: next_state = done_s ? WAIT_PLAYER : WAIT_SELECTOR_DONE;
-			WAIT_PLAYER: next_state = player_has_input ? DO_LOGIC : WAIT_PLAYER;
-			DO_LOGIC: next_state = DRAW_BOARD;
+			WAIT_PLAYER: next_state = WAIT_PLAYER;//player_has_input ? DO_LOGIC : WAIT_PLAYER;
+			DO_LOGIC: next_state = DRAW_BOARD_0;
 		endcase
+		
+		if(reset == 1'b1)
+			next_state = RESET;
 	end
 	
 	always@(posedge clk)
@@ -346,7 +409,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 		
 			RESET: 
 			begin
-				cells = {3'b001, 3'b111, 3'b000, 3'b110,
+				cells <= {3'b001, 3'b111, 3'b000, 3'b110,
                          3'b101, 3'b000, 3'b111, 3'b010,
                          3'b001, 3'b111, 3'b000, 3'b110,
                          3'b101, 3'b000, 3'b111, 3'b010};
@@ -357,185 +420,185 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 			end
 						
 			DRAW_BOARD_0: begin
-				bg_colour_decoder(cells[2:0], colour1_out);
-				fg_colour_decoder(cells[2:0], colour2_out);
+				bg_colour <= cells[2:0];
+				fg_colour <= cells[2:0];
 				load_p <= 1'b1;
-				x_out <= 8'b00001010;
-				y_out <= 7'b0011110;
+				x_out <= 8'b00011110;
+				y_out <= 7'b0001010;
 			end
 			WAIT_BOARD_0: begin 
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_1: begin
-				bg_colour_decoder(cells[5:3], colour1_out);
-				fg_colour_decoder(cells[5:3], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[5:3];
+				fg_colour <= cells[5:3];			
+				load_p <= 1'b1;
 				x_out <= 8'b00110111;
 				y_out <= 7'b0001011;
 			end
 			WAIT_BOARD_1: begin
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_2: begin 
-				bg_colour_decoder(cells[8:6], colour1_out);
-				fg_colour_decoder(cells[8:6], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[8:6];
+				fg_colour <= cells[8:6];			
+				load_p <= 1'b1;
 				x_out <= 8'b01010000;
 				y_out <= 7'b0001011;
 			end
 			WAIT_BOARD_2: begin
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_3: begin
-				bg_colour_decoder(cells[11:9], colour1_out);
-				fg_colour_decoder(cells[11:9], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[11:9];
+				fg_colour <= cells[11:9];			
+				load_p <= 1'b1;
 				x_out <= 8'b01101001;
 				y_out <= 7'b0001011;
 			end
 			WAIT_BOARD_3: begin
-				load_p = 1'b0;			
+				load_p <= 1'b0;			
 			end
 			DRAW_BOARD_4: begin
-				bg_colour_decoder(cells[14:12], colour1_out);
-				fg_colour_decoder(cells[14:12], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[14:12];
+				fg_colour <= cells[14:12];			
+				load_p <= 1'b1;
 				x_out <= 8'b00011110;
 				y_out <= 7'b0100011;
 			end
 			WAIT_BOARD_4: begin
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_5: begin 
-				bg_colour_decoder(cells[17:15], colour1_out);
-				fg_colour_decoder(cells[17:15], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[17:15];
+				fg_colour <= cells[17:15];			
+				load_p <= 1'b1;
 				x_out <= 8'b00110111;
 				y_out <= 7'b0100011;
 			end
 			WAIT_BOARD_5: begin
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_6: begin
-				bg_colour_decoder(cells[20:18], colour1_out);
-				fg_colour_decoder(cells[20:18], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[20:18];
+				fg_colour <= cells[20:18];			
+				load_p <= 1'b1;
 				x_out <= 8'b01010000;
 				y_out <= 7'b0100011;
 			end
 			WAIT_BOARD_6: begin
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_7: begin
-				bg_colour_decoder(cells[23:21], colour1_out);
-				fg_colour_decoder(cells[23:21], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[23:21];
+				fg_colour <= cells[23:21];			
+				load_p <= 1'b1;
 				x_out <= 8'b01101001;
 				y_out <= 7'b0100011;
 			end
 			WAIT_BOARD_7: begin 
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_8: begin
-				bg_colour_decoder(cells[26:24], colour1_out);
-				fg_colour_decoder(cells[26:24], colour2_out);			
-				load_p = 1'b1;
-				x_out <= 8'b00001110;
+				bg_colour <= cells[26:24];
+				fg_colour <= cells[26:24];			
+				load_p <= 1'b1;
+				x_out <= 8'b00011110;
 				y_out <= 7'b0111100;
 			end
 			WAIT_BOARD_8: begin
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_9: begin
-				bg_colour_decoder(cells[29:27], colour1_out);
-				fg_colour_decoder(cells[29:27], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[29:27];
+				fg_colour <= cells[29:27];			
+				load_p <= 1'b1;
 				x_out <= 8'b00110111;
 				y_out <= 7'b0111100;
 			end
 			WAIT_BOARD_9: begin
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_10: begin
-				bg_colour_decoder(cells[32:30], colour1_out);
-				fg_colour_decoder(cells[32:30], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[32:30];
+				fg_colour <= cells[32:30];			
+				load_p <= 1'b1;
 				x_out <= 8'b01010000;
 				y_out <= 7'b0111100;
 			end
 			WAIT_BOARD_10: begin 
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_11: begin
-				bg_colour_decoder(cells[35:33], colour1_out);
-				fg_colour_decoder(cells[35:33], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[35:33];
+				fg_colour <= cells[35:33];			
+				load_p <= 1'b1;
 				x_out <= 8'b01101001;
 				y_out <= 7'b0111100;
 			end
 			WAIT_BOARD_11: begin
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_12: begin 
-				bg_colour_decoder(cells[38:36], colour1_out);
-				fg_colour_decoder(cells[38:36], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[38:36];
+				fg_colour <= cells[38:36];			
+				load_p <= 1'b1;
 				x_out <= 8'b00011110;
 				y_out <= 7'b1010101;
 			end
 			WAIT_BOARD_12: begin
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_13: begin
-				bg_colour_decoder(cells[41:39], colour1_out);
-				fg_colour_decoder(cells[41:39], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[41:39];
+				fg_colour <= cells[41:39];			
+				load_p <= 1'b1;
 				x_out <= 8'b00110111;
 				y_out <= 7'b1010101;
 			end
 			WAIT_BOARD_13: begin
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_14: begin
-				bg_colour_decoder(cells[44:42], colour1_out);
-				fg_colour_decoder(cells[44:42], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[44:42];
+				fg_colour <= cells[44:42];
+				load_p <= 1'b1;
 				x_out <= 8'b01010000;
 				y_out <= 7'b1010101;
 			end
 			WAIT_BOARD_14: begin
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			DRAW_BOARD_15: begin
-				bg_colour_decoder(cells[47:45], colour1_out);
-				fg_colour_decoder(cells[47:45], colour2_out);			
-				load_p = 1'b1;
+				bg_colour <= cells[47:45];
+				fg_colour <= cells[47:45];
+				load_p <= 1'b1;
 				x_out <= 8'b01101001;
 				y_out <= 7'b1010101;
 			end
 			WAIT_BOARD_15: begin
-				load_p = 1'b0;
+				load_p <= 1'b0;
 			end
 			
-			DRAW_SELECTOR:
+			DRAW_SELECTOR: load_p <= 1'b0;
 				
 				
-			WAIT_SELECTOR_DONE:
+			WAIT_SELECTOR_DONE: load_p <= 1'b0;
 			
-			WAIT_PLAYER:
+			WAIT_PLAYER: load_p <= 1'b0;
 			
-			DO_LOGIC:
+			DO_LOGIC: load_p <= 1'b0;
 
 			default:
-				next_state = RESET;
+				next_state <= RESET;
 				
 		endcase
 	end
 	
 	always @(posedge clk) begin
-		if(reset == 1'b0)
-			next_state = RESET; // Should restart
-		curr_state = next_state;
+		 // Should restart
+		curr_state <= next_state;
+		hex_state <= curr_state;
 	end	
 
 endmodule
@@ -545,32 +608,66 @@ module bg_colour_decoder(cell_data, colour);
 	input [2:0] cell_data;
 	output reg [2:0] colour;
 	
-	case (cell_data)
-		// White
-		3'b111, 3'b101, 3'b110:
-			colour = 3'b111;
-		// Black
-		3'b000, 3'b001, 3'b010, default:
-			colour = 3'b000;
-	endcase
+	always@(*) begin
+		case (cell_data)
+			// White
+			3'b111, 3'b101, 3'b110:
+				colour <= 3'b111;
+			// Black
+			3'b000, 3'b001, 3'b010:
+				colour <= 3'b000;
+			default:
+				colour <= 3'b000;
+		endcase
+	end
 endmodule
 
 module fg_colour_decoder(cell_data, colour);
 	input [2:0] cell_data;
 	output  reg [2:0] colour;
 	
-	case (cell_data)
-		// White
-		3'b111:
-			colour = 3'b111;
-		// Blue
-		3'b001, 3'b101:
-			colour = 3'b001;
-		// Yellow
-		3'b010, 3'b110:
-			colour = 3'110;
-		// Black
-		3'b000, default:
-			colour = 3'b000
-	endcase
+	always@(*) begin
+		case (cell_data)
+			// White
+			3'b111:
+				colour <= 3'b111;
+			// Blue
+			3'b001, 3'b101:
+				colour <= 3'b001;
+			// Yellow
+			3'b010, 3'b110:
+				colour <= 3'b110;
+			// Black
+			3'b000: 
+				colour <= 3'b000;
+			default:
+				colour <= 3'b000;
+		endcase
+	end
 endmodule	
+
+module hex_decoder(hex_digit, segments);
+    input [3:0] hex_digit;
+    output reg [6:0] segments;
+   
+    always @(*)
+        case (hex_digit)
+            4'h0: segments = 7'b100_0000;
+            4'h1: segments = 7'b111_1001;
+            4'h2: segments = 7'b010_0100;
+            4'h3: segments = 7'b011_0000;
+            4'h4: segments = 7'b001_1001;
+            4'h5: segments = 7'b001_0010;
+            4'h6: segments = 7'b000_0010;
+            4'h7: segments = 7'b111_1000;
+            4'h8: segments = 7'b000_0000;
+            4'h9: segments = 7'b001_1000;
+            4'hA: segments = 7'b000_1000;
+            4'hB: segments = 7'b000_0011;
+            4'hC: segments = 7'b100_0110;
+            4'hD: segments = 7'b010_0001;
+            4'hE: segments = 7'b000_0110;
+            4'hF: segments = 7'b000_1110;   
+            default: segments = 7'h7f;
+        endcase
+endmodule 
