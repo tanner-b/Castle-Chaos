@@ -77,7 +77,7 @@ module CastleChaos
 		
 		// instantiate all the modules we wrote for this game
 		Draw_Grid_FSM grid_drawer(.clk(CLOCK_50), .done(done_p), .load_p(load_p), .reset(~resetn), .start_x(start_x), .start_y(start_y), .bg_colour(colour_1), .fg_colour(colour_2), .x_pos(x), .y_pos(y), .colour_out(colour), .draw(writeEn));
-		//Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .start_x(start_x), .start_y(start_y), .colour_in(colour_1), .done(done_s), .x_pos(x), .y_pos(y), .colour_out(colour), .draw(writeEn));
+		// Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .start_x(start_x), .start_y(start_y), .colour_in(colour_1), .done(done_s), .x_pos(x), .y_pos(y), .colour_out(colour), .draw(writeEn));
 		game_controller_fsm main(.load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(colour_1), .colour2_out(colour_2), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(KEY[3:0]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state));
 		hex_decoder hex0 (.hex_digit(start_x[3:0]), .segments(HEX0));
 		hex_decoder hex1 (.hex_digit(start_y[3:0]), .segments(HEX1));
@@ -319,7 +319,6 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 	
 	reg [2:0] fg_colour, bg_colour;
 	//reg player_turn = 0;
-	//reg player_input = 2'b00;
 	
 	fg_colour_decoder myfg (.cell_data(fg_colour), .colour(colour2_out));
 	bg_colour_decoder mybg (.cell_data(bg_colour), .colour(colour1_out));
@@ -330,7 +329,11 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 	// bits[1:0] -> 00 : black, 10 : white, 01 : blue, 11 : yellow;
 	reg [47:0] cells; 
 	
-	//assign player_has_input = direction[0] | direction[1] | direction[2] | direction[3];
+	assign player_has_input = direction[0] || direction[1] || direction[2] || direction[3];
+	
+	reg player_input = 2'b00;
+	
+	parameter UP = 2'b00, DOWN = 2'b01, LEFT = 2'b10, RIGHT = 2'b11;
 	
 	parameter RESET = 6'b000000, 
 	DRAW_BOARD_0 = 6'b000001, WAIT_BOARD_0 = 6'b000010,
@@ -350,11 +353,11 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 	DRAW_BOARD_14 = 6'b011101, WAIT_BOARD_14 = 6'b011110,
 	DRAW_BOARD_15 = 6'b011111, WAIT_BOARD_15 = 6'b100000,	
 	DRAW_SELECTOR = 6'b100001, 
-			  WAIT_SELECTOR_DONE = 6'b100010, WAIT_PLAYER = 6'b100011, DO_LOGIC = 6'b100100;
+	WAIT_SELECTOR_DONE = 6'b100010, WAIT_PLAYER = 6'b100011, 
+	WAIT_PLAYER_UP = 6'b100100, DO_LOGIC = 6'b100101;
+	
 	reg [5:0] curr_state = RESET;
 	reg [5:0] next_state = DRAW_BOARD_0;		  
-	
-			  
 	
 	// State changing logic		  
 	always@(*) begin
@@ -394,8 +397,13 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 			WAIT_BOARD_15: next_state = done_p ? WAIT_PLAYER : WAIT_BOARD_15;
 			
 			DRAW_SELECTOR: next_state = WAIT_SELECTOR_DONE;
+			
 			WAIT_SELECTOR_DONE: next_state = done_s ? WAIT_PLAYER : WAIT_SELECTOR_DONE;
-			WAIT_PLAYER: next_state = WAIT_PLAYER;//player_has_input ? DO_LOGIC : WAIT_PLAYER;
+			
+			WAIT_PLAYER: next_state = player_has_input ? WAIT_PLAYER_UP : WAIT_PLAYER;
+			
+			WAIT_PLAYER_UP: next_state = player_has_input ? WAIT_PLAYER_UP : DO_LOGIC;
+			
 			DO_LOGIC: next_state = DRAW_BOARD_0;
 		endcase
 		
@@ -580,19 +588,145 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 				load_p <= 1'b0;
 			end
 			
-			DRAW_SELECTOR: load_p <= 1'b0;
+			DRAW_SELECTOR: begin
+				load_p <= 1'b0;
+				load_s <= 1'b1;
+				bg_colour <= 3'b100; // RED for the selector outline.
 				
-				
-			WAIT_SELECTOR_DONE: load_p <= 1'b0;
+				// Figure out what X and Y to draw the selector at
+				case (selector)
+					// 0
+					4'b0000: begin
+						x_out <= 8'b00011110;
+						y_out <= 7'b0001010;
+					end
+					
+					// 1
+					4'b0001: begin
+						x_out <= 8'b00110111;
+						y_out <= 7'b0001011;
+					end
+					
+					// 2
+					4'b0010: begin
+						x_out <= 8'b00110111;
+						y_out <= 7'b0001011;
+					end
+					
+					// 3
+					4'b0011: begin
+						x_out <= 8'b01101001;
+						y_out <= 7'b0001011;
+					end
+					
+					// 4
+					4'b0100: begin
+						x_out <= 8'b00011110;
+						y_out <= 7'b0100011;				
+					end
+					
+					// 5
+					4'b0101: begin
+						x_out <= 8'b00110111;
+						y_out <= 7'b0100011;
+					end
+					
+					// 6
+					4'b0110: begin
+						x_out <= 8'b00110111;
+						y_out <= 7'b0100011;
+					end
+					
+					// 7
+					4'b0111: begin
+						x_out <= 8'b01101001;
+						y_out <= 7'b0100011;
+					end
+					
+					// 8
+					4'b1000: begin
+						x_out <= 8'b00011110;
+						y_out <= 7'b0111100;
+					end
+					
+					// 9
+					4'b1001: begin
+						x_out <= 8'b00110111;
+						y_out <= 7'b0111100;
+					end
+					
+					// 10
+					4'b1010: begin
+						x_out <= 8'b00110111;
+						y_out <= 7'b0111100;
+					end
+					
+					// 11
+					4'b1011: begin
+						x_out <= 8'b01101001;
+						y_out <= 7'b0111100;
+					end
+					
+					// 12
+					4'b1100: begin
+						x_out <= 8'b00011110;
+						y_out <= 7'b1010101;
+					end
+					
+					// 13
+					4'b1101: begin 
+						x_out <= 8'b00110111;
+						y_out <= 7'b1010101;
+					end
+					
+					// 14
+					4'b1110: begin
+						x_out <= 8'b00110111;
+						y_out <= 7'b1010101;
+					end
+					
+					// 15
+					4'b1111: begin
+						x_out <= 8'b01101001;
+						y_out <= 7'b1010101;
+					end
+					
+					default: begin
+						x_out <= 8'b00011110;
+						y_out <= 7'b0111100;
+					end
+				endcase		
+			end
+			
+			WAIT_SELECTOR_DONE: begin
+				load_p <= 1'b0;
+				load_s <= 1'b0;
+			end 
 			
 			WAIT_PLAYER: load_p <= 1'b0;
 			
+			WAIT_PLAYER_UP: begin
+				load_p <= 1'b0;
+				case (direction)
+					4'b1000: player_input = UP;
+					4'b1000: player_input = DOWN;
+					4'b1000: player_input = LEFT;
+					4'b1000: player_input = RIGHT;
+					default: player_input = UP; // Up by default if more than one button happens to be down at once
+				endcase
+			end
+				
 			DO_LOGIC: load_p <= 1'b0;
+			// GAME LOGIC
+			
 
 			default:
 				next_state <= RESET;
 				
 		endcase
+		
+		
+		
 	end
 	
 	always @(posedge clk) begin
