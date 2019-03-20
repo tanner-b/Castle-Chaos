@@ -208,6 +208,108 @@ endmodule
 
 
 
+module draw_yellow_losses(clk, reset, new_loss, start_x, start_y, colour_in, done, x_pos, y_pos, colour_out, draw);
+	input clk;
+	input reset;
+	input load_s;
+	input [7:0] start_x;
+	input [6:0] start_y;
+	input [2:0] colour_in;
+
+	// this is passed into the module which draws the pixel on the screen
+	output reg [7:0] x_pos;
+	output reg [6:0] y_pos;
+	output [2:0] colour_out;
+	assign colour_out = colour_in;
+	output reg draw;
+
+	// this signals when the module finished drawing the current grid to the screen
+	output reg done = 1'b0;
+	
+	// We need the same registers as in Draw_Grid_FSM for internal computations
+	reg [3:0] pixel_counter;	// Bits [0:1] are x offset, bits [2:3] are y offset
+	
+	reg curr_state = WAIT;
+	reg next_state = WAIT;
+	reg wait_one_cycle;
+	parameter WAIT = 3'b000, FIRST_LOSS = 3'b001, SECOND_LOSS = 3'b011, THIRD_LOSS = 3'b111, FOURTH_LOSS = 3'b110, DONE = 3'b100;
+
+	// this determines the next state
+	always@(*) begin
+		case(curr_state)
+			WAIT: next_state = new_loss ? FIRST_LOSS : WAIT;
+			// 
+			FIRST_LOSS: next_state = (new_loss && (pixel_counter == 4'b1111)) ? SECOND_LOSS : FIRST_LOSS;
+			// 
+			SECOND_LOSS: next_state = (new_loss && (pixel_counter == 4'b1111)) ? THIRD_LOSS : SECOND_LOSS;
+			// 
+			THIRD_LOSS: next_state = (new_loss && (pixel_counter == 4'b1111)) ? FOURTH_LOSS : THIRD_LOSS;
+			// 
+			FOURTH_LOSS: next_state = (new_loss && (pixel_counter == 4'b1111)) ? DONE : FOURTH_LOSS;
+			DONE: next_state = WAIT;
+		endcase
+	end
+	
+	
+	always @(posedge clk) begin	
+		curr_state = next_state;
+   end
+
+
+   // what to do at each state
+	always@(posedge clk) begin: state_table
+		case (curr_state) 
+		
+			WAIT: begin 
+				done <= 1'b0;
+				// each counter starts at 0
+				x_pos <= reg_x + {6'b000000, pixel_counter[1:0]}; // We use pixel_counter[1:0] as x offset
+				y_pos <= reg_y + {5'b00000, pixel_counter[3:2]}; // We use pixel_counter[3:2] as y offset
+				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
+				else pixel_counter <= pixel_counter + 4'b0001;
+				draw <= 1'b0;
+			end
+
+			FIRST_LOSS: begin
+				x_pos <= start_x + {5'b00000, x_incr[4:0]};
+				y_pos <= start_y + {4'b0000, y_incr[4:0]}; 
+				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
+				else x_incr <= x_incr - 5'b0001;
+				draw <= 1'b1;
+			end
+
+			SECOND_LOSS: begin
+				x_pos <= start_x + {5'b00000, x_incr[4:0]};
+				y_pos <= start_y + {4'b0000, y_incr[4:0]}; 
+				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
+				else y_incr <= y_incr - 5'b0001;
+				draw <= 1'b1;
+			end
+
+			THIRD_LOSS: begin
+				x_pos <= start_x + {5'b00000, x_incr[4:0]};
+				y_pos <= start_y + {4'b0000, y_incr[4:0]}; 
+				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
+				else x_incr <= x_incr + 5'b0001;
+				draw <= 1'b1;
+			end
+
+			FOURTH_LOSS: begin
+				x_pos <= start_x + {5'b00000, x_incr[4:0]};
+				y_pos <= start_y + {4'b0000, y_incr[4:0]}; 
+				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
+				else y_incr <= y_incr + 5'b0001;
+				draw <= 1'b1;
+			end
+
+			DONE: next_state = WAIT;
+		endcase
+		
+	end
+		
+endmodule
+
+
 
 // selector will draw inside of a given grid. The thickness of the boarder will be one pixel wide
 
@@ -245,13 +347,13 @@ module Selector_Drawer_FSM(clk, reset, load_s, start_x, start_y, colour_in, done
 		case(curr_state)
 			WAIT: next_state = load_s ? TOP_BOARDER : WAIT;
 			// X counter reached 0, Y stayed at 25
-			BOTTOM_BOARDER: next_state = ((x_incr == 5'b00000) && (y_incr == 5'b11001)) ? RIGHT_BOARDER : TOP_BOARDER;
+			BOTTOM_BOARDER: next_state = ((x_incr == 5'b00000) && (y_incr == 5'b11001)) ? LEFT_BOARDER : BOTTOM_BOARDER;
 			// Y counter reached 0, X stayed at 0
-			LEFT_BOARDER: next_state = ((x_incr == 5'b00000) && (y_incr == 5'b00000)) ? BOTTOM_BOARDER : RIGHT_BOARDER;
+			LEFT_BOARDER: next_state = ((x_incr == 5'b00000) && (y_incr == 5'b00000)) ? TOP_BOARDER : LEFT_BOARDER;
 			// X counter went back up to 25, Y stayed at 0
-			TOP_BOARDER: next_state = ((x_incr == 5'b11001) && (y_incr == 5'b00000)) ? LEFT_BOARDER : BOTTOM_BOARDER;
+			TOP_BOARDER: next_state = ((x_incr == 5'b11001) && (y_incr == 5'b00000)) ? RIGHT_BOARDER : TOP_BOARDER;
 			// Y counter went back up to 25, X stayed at 25
-			RIGHT_BOARDER: next_state = ((x_incr == 5'b11001) && (y_incr == 5'b11001)) ? DONE : LEFT_BOARDER;
+			RIGHT_BOARDER: next_state = ((x_incr == 5'b11001) && (y_incr == 5'b11001)) ? DONE : RIGHT_BOARDER;
 			DONE: next_state = WAIT;
 		endcase
 	end
