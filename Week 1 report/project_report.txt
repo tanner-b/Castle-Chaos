@@ -1,0 +1,119 @@
+﻿CSCB58 Project Report: Winter 2019
+
+Team Member A
+-------------
+First Name: Tanner
+Last Name: Bergeron
+Student Number: 1003924872
+UofT E-mail Address: tanner.bergeron@mail.utoronto.ca
+
+
+Team Member B
+-------------
+First Name: Sofia
+Last Name: Ilina
+Student Number: 1003912581
+UofT E-mail Address: sofia.ilina@mail.utoronto.ca
+
+Project Plan
+--------
+
+Project Title: Castle Chaos
+
+Provide a one paragraph description of your project:
+
+	Imagine chess on a 4x4 game board, but only with castle pieces that can only move 1 space at a time.
+	The game has 2 players, each with 4 starting castle pieces on thier respective side of the board.
+	During each player's turn, they move one of their castle pieces one space (Up, Down, Left, Right)
+	and try to "crush" one of the other player's castles. Your castle piece becomes crushed if an opposing
+	player's castle moves onto the square that your piece currently occupies. The object of the game is to
+	be the only player with castle pieces on the board. 
+
+What is your plan for the first week?
+	
+	We will be using VGA graphics to display the state of the game board. We intend to define the registers
+	that we will use as memory to hold the current state of the game. Once we have a game state, we can then
+	create the drawing code that will draw the state of the game to the screen with a black and white checkerboard
+	as the game board, and yellow and blue castle pieces for each of the teams respectively.
+	
+	The game state should keep track of:
+	- Where each of the 8 pieces are on the 4x4 board
+	- Which pieces belong to who
+	- Which grid the selector cursor is currently highlighting
+	
+	We will draw graphics such as
+	- The outline of the game board
+	- The black and white checkerboard pattern that is the 4x4 board
+	- The 8 blue and yellow castle pieces at their respective locations on the board
+
+What is your plan for the second week?
+	
+	We intend to create the FSM that controls the flow of the game loop. 
+	In essence we should have the following structure:
+	
+           +-----------------------------------------------------------+
+           V                                                           |
+    (draw graphics) --> (wait for input) --SW[17:14]--> (update cursor position)
+           ^                  | ^
+           |                  | +---------------------------------------------------NOT_VALID
+           |                  |                                                          |
+           |                  +---- KEY[3:0] == 1 --> (check if move is valid) ----------+
+           |                                                          			         |
+           +------------------- (update game board) <------------------------------- IS_VALID
+
+
+	We will have the switches SW[17:16] to select one of the 4 letter coordinates of the 
+	grid and SW[15:14] to select the numerical coordinate. These switches can be used to select
+	one of the 16 possible cells containing a castle you want to move while SW[0]=0.
+	Each time a switch input from SW[17:14] is changed, the board will automatically update
+	the highlighting of the cell which has been selected. Once SW[0] is changed to 1 and if the
+	grid selected is valid (it contains a castle), the game will wait for a direction input:
+	KEY[3:2] is UP/DOWN, KEY[1:0] is LEFT/RIGHT. When that signal is received and if it is
+	valid, the gameboard gets updated with the new game state.
+
+	Keys [3:0] then become your {U, D, L, R} controls to where you want the selected
+	piece to go. If the selected piece lands on a cell occupied by another piece then
+	the other piece is crushed and is "removed" from the board.
+
+What is your plan for the third week?
+
+	Week 3 is where we plan to add the "quality of life" improvements to the game. At this
+	point, there is no logic to prevent you from crushing your own pieces, or having the 
+	piece locations wrap around to other locations because of bit overflow. We will also try to
+	keep track of the current score on the screen. We can also add flashing lights to indicate
+	a piece being crushed, or if a move is invalid, etc. There are many things we can do
+	and we will see how much we have completed from the previous two weeks and decide how
+	much more we can do from there.
+
+What is your backup plan if things don’t work out as planned?
+
+	We would cut the "quality of life" features of the game and not worry about many of the
+	failsafe checking that is involved with making sure a dumb player cant make illegal moves.
+	Essentially cut week 3 features until we are able to accomplish weeks 1 and 2.
+
+Weekly Reports
+--------------
+<In this space, provide a report each week of what worked and what didn't, and what (if any) changes were made to your proposal)>
+
+Week 1:
+    - We coded up an FSM that controls drawing individual grid pieces of the board, given a background tile color and the figure color
+      (blue/yellow if the grid contains a figure, black/white if the grid is empty, the color is the same as its background)
+      This FSM also takes as input a top left corner of the grid piece and draws the whole grid and its contents in that location.
+    - We coded up another FSM which will be used to display the selected grid piece when the user will be choosing which piece to
+      move on the board. This will just create a 1-pixel wide outline on the interior of the selected grid. We have not tested this
+      module yet because we did not write any logic to select a grid yet.
+    - Finally, the most important FSM we coded up is the game logic FSM. It will still require future modifications and improvements.
+      For now all it does is draws the initial state of the board with all blue figures aligned on the far left column of the board,
+      and all 4 yellow figures ligned up on the far right column of the board. Next week we plan to work on implementing the logic to
+      move a selected piece to a valid new position, and possibly destroy one of the opponent's pieces
+    - We created the memory to store board state data, so that when that data gets modified, these changes will be displayed on the screen.
+    - The coloured pieces based are drawn dynamically on the game board, depending on their position on the grid 
+      (for now only can be changed manually).
+    - We completed everything we said we were going to in the week 1 proposal.
+
+Link to git repo: https://github.com/tanner-b/Castle-Chaos
+
+References
+----------
+We used the VGA files provided to us by Professor Moshe for lab 6, which helped us display our game on the screen. We used his black.mif
+file which fills the whole screen initially with black pixels. The rest of the code is completely our own.

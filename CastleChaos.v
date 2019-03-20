@@ -69,16 +69,20 @@ module CastleChaos
 		
 		wire load_p, load_s;
 		wire done_p, done_s;
-		wire [7:0] start_x;
-		wire [6:0] start_y;
-		wire [2:0] colour_1, colour_2;
+		wire [2:0] grid_colour; selector_colour;
+		wire [7:0] start_x; x_grid; x_selector;
+		wire [6:0] start_y; y_grid; y_selector;
+		wire [2:0] bg_colour, fg_colour;
+		wire s; // s==0 means we are drawing a grid, s==1 means we are drawing a red selector outline
 		wire writeEn;
 		wire [5:0] state;
 		
 		// instantiate all the modules we wrote for this game
-		Draw_Grid_FSM grid_drawer(.clk(CLOCK_50), .done(done_p), .load_p(load_p), .reset(~resetn), .start_x(start_x), .start_y(start_y), .bg_colour(colour_1), .fg_colour(colour_2), .x_pos(x), .y_pos(y), .colour_out(colour), .draw(writeEn));
-		// Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .start_x(start_x), .start_y(start_y), .colour_in(colour_1), .done(done_s), .x_pos(x), .y_pos(y), .colour_out(colour), .draw(writeEn));
-		game_controller_fsm main(.load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(colour_1), .colour2_out(colour_2), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(KEY[3:0]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state));
+		Draw_Grid_FSM grid_drawer(.clk(CLOCK_50), .done(done_p), .load_p(load_p), .reset(~resetn), .start_x(start_x), .start_y(start_y), .bg_colour(bg_colour), .fg_colour(fg_colour), .x_pos(x_grid), .y_pos(y_grid), .colour_out(grid_colour), .draw(writeEn));
+		Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .start_x(start_x), .start_y(start_y), .colour_in(bg_colour), .done(done_s), .x_pos(x_selector), .y_pos(y_selector), .colour_out(selector_colour), .draw(writeEn));
+		game_controller_fsm main(.load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(bg_colour), .colour2_out(fg_colour), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(KEY[3:0]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state), .s(s));
+		// contract: grid data comes first, then selector data
+		pixel_drawing_MUX mux(.s(s), .colour_in({grid_colour, selector_colour}), .x_in({x_grid, x_selector}), .y_in({y_grid, y_selector}), .colour_out(colour), .x_out(x), .y_out(y));
 		hex_decoder hex0 (.hex_digit(start_x[3:0]), .segments(HEX0));
 		hex_decoder hex1 (.hex_digit(start_y[3:0]), .segments(HEX1));
 		hex_decoder hex4 (.hex_digit(state[3:0]), .segments(HEX4));
@@ -304,7 +308,7 @@ endmodule
 	//		([56:80], [11:35]); 	([106:130], [11:35]);		([31:55], [36:60]);		([81:105], [36:60]);
 	//		([56:80], [61:85]);		([106:130], [61:85]);		([31:55], [86:110]);	([81:105], [86:110]);
 
-module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_out, done_p, done_s, selector, direction, clk, reset, hex_state);
+module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_out, done_p, done_s, selector, direction, clk, reset, hex_state, s);
 
 	input [3:0] selector; // Changes the cell the selector is on
 	input [3:0] direction; // Tries to move the selected peice up, down, left, right
@@ -316,6 +320,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 	output reg [6:0] y_out;
 	output [2:0] colour1_out, colour2_out; // Two colour outputs used by the drawers.
 	output reg [5:0] hex_state;
+	output reg s; // s==0 means we draw a grid, s==1 means we draw the red selector outline
 	
 	reg [2:0] fg_colour, bg_colour;
 	//reg player_turn = 0;
@@ -428,6 +433,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 			end
 						
 			DRAW_BOARD_0: begin
+				s <= 1'b0; 					// start drawing the grids
 				bg_colour <= cells[2:0];
 				fg_colour <= cells[2:0];
 				load_p <= 1'b1;
@@ -589,6 +595,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 			end
 			
 			DRAW_SELECTOR: begin
+				s <= 1'b1; 					// start drawing the selector
 				load_p <= 1'b0;
 				load_s <= 1'b1;
 				bg_colour <= 3'b100; // RED for the selector outline.
@@ -779,6 +786,38 @@ module fg_colour_decoder(cell_data, colour);
 		endcase
 	end
 endmodule	
+
+
+module pixel_drawing_MUX(s, colour_in, x_in, y_in, colour_out, x_out, y_out);
+	input s; // s==0 means we draw a grid, s==1 means we draw the red selector outline
+	input [5:0] colour_in;	// [5:3] = grid_color, [2:0] = selector_color
+	input [15:0] x_in;	// [15:8] = grid x, [7:0] = selector x
+	input [13:0] y_in;	// [13:7] = grid y, [6:0] = selector y
+
+	reg [2:0] colour_out;
+	reg [7:0] x_out;
+	reg [6:0] y_out;
+
+	always @(*) begin
+		case (s)
+			1'b0: begin							// case: grid
+				colour_out <= colour_in[5:3];
+				x_out <= x_in[15:8];
+				y_out <= y_in[13:7];
+				end
+			1'b1: begin
+				colour_out <= colour_in[2:0];
+				x_out <= x_in[7:0];
+				y_out <= y_in[6:0];
+				end
+		endcase
+	end
+endmodule
+
+
+module score_FSM();
+
+endmodule
 
 module hex_decoder(hex_digit, segments);
     input [3:0] hex_digit;
