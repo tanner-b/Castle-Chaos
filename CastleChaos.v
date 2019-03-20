@@ -331,7 +331,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 	
 	assign player_has_input = direction[0] || direction[1] || direction[2] || direction[3];
 	
-	reg player_input = 2'b00;
+	reg player_input;
 	
 	parameter UP = 2'b00, DOWN = 2'b01, LEFT = 2'b10, RIGHT = 2'b11;
 	
@@ -709,9 +709,9 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 				load_p <= 1'b0;
 				case (direction)
 					4'b1000: player_input = UP;
-					4'b1000: player_input = DOWN;
-					4'b1000: player_input = LEFT;
-					4'b1000: player_input = RIGHT;
+					4'b0100: player_input = DOWN;
+					4'b0010: player_input = LEFT;
+					4'b0001: player_input = RIGHT;
 					default: player_input = UP; // Up by default if more than one button happens to be down at once
 				endcase
 			end
