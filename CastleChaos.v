@@ -15,8 +15,12 @@ module CastleChaos
 		VGA_B,
 		HEX0,
 		HEX1,
+		HEX2,
+		HEX3,
 		HEX4,
-		HEX5//	VGA Blue[9:0]
+		HEX5, //	VGA Blue[9:0]
+		HEX6,
+		HEX7
 	);
 
 	input			CLOCK_50;				//	50 MHz
@@ -69,25 +73,35 @@ module CastleChaos
 		
 		wire load_p, load_s;
 		wire done_p, done_s;
-		wire [7:0] start_x;
-		wire [6:0] start_y;
-		wire [2:0] colour_1, colour_2;
+		wire [2:0] grid_colour; selector_colour;
+		wire [7:0] start_x; x_grid; x_selector;
+		wire [6:0] start_y; y_grid; y_selector;
+		wire [2:0] bg_colour, fg_colour;
+		wire [4:0] score_y; score_b;
+		wire s; // s==0 means we are drawing a grid, s==1 means we are drawing a red selector outline
 		wire writeEn;
 		wire [5:0] state;
 		
 		// instantiate all the modules we wrote for this game
-		Draw_Grid_FSM grid_drawer(.clk(CLOCK_50), .done(done_p), .load_p(load_p), .reset(~resetn), .start_x(start_x), .start_y(start_y), .bg_colour(colour_1), .fg_colour(colour_2), .x_pos(x), .y_pos(y), .colour_out(colour), .draw(writeEn));
-		// Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .start_x(start_x), .start_y(start_y), .colour_in(colour_1), .done(done_s), .x_pos(x), .y_pos(y), .colour_out(colour), .draw(writeEn));
-		game_controller_fsm main(.load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(colour_1), .colour2_out(colour_2), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(KEY[3:0]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state));
-		hex_decoder hex0 (.hex_digit(start_x[3:0]), .segments(HEX0));
-		hex_decoder hex1 (.hex_digit(start_y[3:0]), .segments(HEX1));
-		hex_decoder hex4 (.hex_digit(state[3:0]), .segments(HEX4));
-		hex_decoder hex5 (.hex_digit({2'b00, state[5:4]}), .segments(HEX5));
-			
+		Draw_Grid_FSM grid_drawer(.clk(CLOCK_50), .done(done_p), .load_p(load_p), .reset(~resetn), .start_x(start_x), .start_y(start_y), .bg_colour(bg_colour), .fg_colour(fg_colour), .x_pos(x_grid), .y_pos(y_grid), .colour_out(grid_colour), .draw(writeEn));
+		Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .start_x(start_x), .start_y(start_y), .colour_in(bg_colour), .done(done_s), .x_pos(x_selector), .y_pos(y_selector), .colour_out(selector_colour), .draw(writeEn));
+		game_controller_fsm main(.load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(bg_colour), .colour2_out(fg_colour), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(KEY[3:0]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state), .s(s), .score_y(score_b), .score_b(score_b));
+		// contract: grid data comes first, then selector data
+		pixel_drawing_MUX mux(.s(s), .colour_in({grid_colour, selector_colour}), .x_in({x_grid, x_selector}), .y_in({y_grid, y_selector}), .colour_out(colour), .x_out(x), .y_out(y));
+		// these are for debugging
+		hex_decoder hex0 (.hex_digit({1'b0, start_x[3:0]}), .segments(HEX0));
+		hex_decoder hex1 (.hex_digit({1'b0, start_y[3:0]}), .segments(HEX1));
+		hex_decoder hex2 (.hex_digit({1'b0, state[3:0]}), .segments(HEX2));
+		hex_decoder hex3 (.hex_digit({3'b000, state[5:4]}), .segments(HEX3));
+		// these keep track of score
+		hex_decoder hex4 (.hex_digit(score_b), .segments(HEX4));	// score blue
+		hex_decoder hex5 (.hex_digit(5'hB), .segments(HEX5));		// label b
+		hex_decoder hex6 (.hex_digit(score_y), .segments(HEX6));	// score yellow
+		hex_decoder hex7 (.hex_digit(5'b10000), .segments(HEX7));	// Label y
+
 endmodule
-	 
-	 
-	 
+	
+
 
 // each checkerboard grid consists of 2 regions:
 //	- the inner box which can either contain a blue or yellow figure (fg)
@@ -304,7 +318,7 @@ endmodule
 	//		([56:80], [11:35]); 	([106:130], [11:35]);		([31:55], [36:60]);		([81:105], [36:60]);
 	//		([56:80], [61:85]);		([106:130], [61:85]);		([31:55], [86:110]);	([81:105], [86:110]);
 
-module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_out, done_p, done_s, selector, direction, clk, reset, hex_state);
+module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_out, done_p, done_s, selector, direction, clk, reset, hex_state, s, score_y, score_b);
 
 	input [3:0] selector; // Changes the cell the selector is on
 	input [3:0] direction; // Tries to move the selected peice up, down, left, right
@@ -316,6 +330,8 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 	output reg [6:0] y_out;
 	output [2:0] colour1_out, colour2_out; // Two colour outputs used by the drawers.
 	output reg [5:0] hex_state;
+	output reg s; // s==0 means we draw a grid, s==1 means we draw the red selector outline
+	output reg [4:0] score_y, score_b;	// scores start at 0
 	
 	reg [2:0] fg_colour, bg_colour;
 	//reg player_turn = 0;
@@ -425,9 +441,12 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 				load_s <= 1'b0;
 				x_out <= 8'b00000000;
 				y_out <= 7'b0000000;
+				score_y <= 5'b00000;		// initialize both scores to 0
+				score_b <= 5'b00000;		
 			end
 						
 			DRAW_BOARD_0: begin
+				s <= 1'b0; 					// start drawing the grids
 				bg_colour <= cells[2:0];
 				fg_colour <= cells[2:0];
 				load_p <= 1'b1;
@@ -589,6 +608,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 			end
 			
 			DRAW_SELECTOR: begin
+				s <= 1'b1; 					// start drawing the selector
 				load_p <= 1'b0;
 				load_s <= 1'b1;
 				bg_colour <= 3'b100; // RED for the selector outline.
@@ -718,6 +738,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 				
 			DO_LOGIC: load_p <= 1'b0;
 			// GAME LOGIC
+			// TANNER: when you write logic for consuming opponent's figures, add 5'b00001 to score_y if blue figure dies or to score_b if yellow figure dies
 			
 
 			default:
@@ -780,28 +801,58 @@ module fg_colour_decoder(cell_data, colour);
 	end
 endmodule	
 
+
+module pixel_drawing_MUX(s, colour_in, x_in, y_in, colour_out, x_out, y_out);
+	input s; // s==0 means we draw a grid, s==1 means we draw the red selector outline
+	input [5:0] colour_in;	// [5:3] = grid_color, [2:0] = selector_color
+	input [15:0] x_in;	// [15:8] = grid x, [7:0] = selector x
+	input [13:0] y_in;	// [13:7] = grid y, [6:0] = selector y
+
+	reg [2:0] colour_out;
+	reg [7:0] x_out;
+	reg [6:0] y_out;
+
+	always @(*) begin
+		case (s)
+			1'b0: begin							// case: grid
+				colour_out <= colour_in[5:3];
+				x_out <= x_in[15:8];
+				y_out <= y_in[13:7];
+				end
+			1'b1: begin
+				colour_out <= colour_in[2:0];
+				x_out <= x_in[7:0];
+				y_out <= y_in[6:0];
+				end
+		endcase
+	end
+endmodule
+
+
 module hex_decoder(hex_digit, segments);
-    input [3:0] hex_digit;
-    output reg [6:0] segments;
+    input [4:0] hex_digit;					// change the hex display to take in an extra bit
+    output reg [6:0] segments;				// we need to display an extra symbol: "Y"
    
     always @(*)
         case (hex_digit)
-            4'h0: segments = 7'b100_0000;
-            4'h1: segments = 7'b111_1001;
-            4'h2: segments = 7'b010_0100;
-            4'h3: segments = 7'b011_0000;
-            4'h4: segments = 7'b001_1001;
-            4'h5: segments = 7'b001_0010;
-            4'h6: segments = 7'b000_0010;
-            4'h7: segments = 7'b111_1000;
-            4'h8: segments = 7'b000_0000;
-            4'h9: segments = 7'b001_1000;
-            4'hA: segments = 7'b000_1000;
-            4'hB: segments = 7'b000_0011;
-            4'hC: segments = 7'b100_0110;
-            4'hD: segments = 7'b010_0001;
-            4'hE: segments = 7'b000_0110;
-            4'hF: segments = 7'b000_1110;   
-            default: segments = 7'h7f;
+            5'h0: segments = 7'b100_0000;
+            5'h1: segments = 7'b111_1001;
+            5'h2: segments = 7'b010_0100;
+            5'h3: segments = 7'b011_0000;
+            5'h4: segments = 7'b001_1001;
+            5'h5: segments = 7'b001_0010;
+            5'h6: segments = 7'b000_0010;
+            5'h7: segments = 7'b111_1000;
+            5'h8: segments = 7'b000_0000;
+            5'h9: segments = 7'b001_1000;
+            5'hA: segments = 7'b000_1000;
+            5'hB: segments = 7'b000_0011;
+            5'hC: segments = 7'b100_0110;
+            5'hD: segments = 7'b010_0001;
+            5'hE: segments = 7'b000_0110;
+            5'hF: segments = 7'b000_1110;   
+			// new symbol: "Y" for input 16
+			5'b10000: segments = 7'b001_0001;
+            default: segments = 7'b100_0000;	// I made default 0
         endcase
 endmodule 
