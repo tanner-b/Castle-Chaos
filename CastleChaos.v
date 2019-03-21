@@ -37,7 +37,7 @@ module CastleChaos
 	output	[9:0]	VGA_R;   				//	VGA Red[9:0]
 	output	[9:0]	VGA_G;	 				//	VGA Green[9:0]
 	output	[9:0]	VGA_B;   				//	VGA Blue[9:0]
-	output [6:0] HEX0, HEX1, HEX4, HEX5;
+	output [6:0] HEX0, HEX1, HEX2, HEX3, HEX4, HEX5, HEX6, HEX7;
 	
 	wire resetn;
 	assign resetn = SW[17];
@@ -73,21 +73,21 @@ module CastleChaos
 		
 		wire load_p, load_s;
 		wire done_p, done_s;
-		wire [2:0] grid_colour; selector_colour;
-		wire [7:0] start_x; x_grid; x_selector;
-		wire [6:0] start_y; y_grid; y_selector;
+		wire [2:0] grid_colour, selector_colour;
+		wire [7:0] start_x, x_grid, x_selector;
+		wire [6:0] start_y, y_grid, y_selector;
 		wire [2:0] bg_colour, fg_colour;
-		wire [4:0] score_y; score_b;
+		wire [4:0] score_y, score_b;
 		wire s; // s==0 means we are drawing a grid, s==1 means we are drawing a red selector outline
 		wire writeEn;
 		wire [5:0] state;
 		
 		// instantiate all the modules we wrote for this game
-		Draw_Grid_FSM grid_drawer(.clk(CLOCK_50), .done(done_p), .load_p(load_p), .reset(~resetn), .start_x(start_x), .start_y(start_y), .bg_colour(bg_colour), .fg_colour(fg_colour), .x_pos(x_grid), .y_pos(y_grid), .colour_out(grid_colour), .draw(writeEn));
-		Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .start_x(start_x), .start_y(start_y), .colour_in(bg_colour), .done(done_s), .x_pos(x_selector), .y_pos(y_selector), .colour_out(selector_colour), .draw(writeEn));
-		game_controller_fsm main(.load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(bg_colour), .colour2_out(fg_colour), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(KEY[3:0]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state), .s(s), .score_y(score_b), .score_b(score_b));
+		Draw_Grid_FSM grid_drawer(.clk(CLOCK_50), .done(done_p), .load_p(load_p), .reset(~resetn), .start_x(start_x), .start_y(start_y), .bg_colour(bg_colour), .fg_colour(fg_colour), .x_pos(x_grid), .y_pos(y_grid), .colour_out(grid_colour), .draw(draw_grid));
+		Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .start_x(start_x), .start_y(start_y), .colour_in(bg_colour), .done(done_s), .x_pos(x_selector), .y_pos(y_selector), .colour_out(selector_colour), .draw(draw_selector));
+		game_controller_fsm main(.load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(bg_colour), .colour2_out(fg_colour), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(KEY[3:0]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state), .s(s), .score_y(score_y), .score_b(score_b));
 		// contract: grid data comes first, then selector data
-		pixel_drawing_MUX mux(.s(s), .colour_in({grid_colour, selector_colour}), .x_in({x_grid, x_selector}), .y_in({y_grid, y_selector}), .colour_out(colour), .x_out(x), .y_out(y));
+		pixel_drawing_MUX mux(.s(s), .draw_enable({draw_grid, draw_selector}), .colour_in({grid_colour, selector_colour}), .x_in({x_grid, x_selector}), .y_in({y_grid, y_selector}), .colour_out(colour), .x_out(x), .y_out(y), .enable(writeEn));
 		// these are for debugging
 		hex_decoder hex0 (.hex_digit({1'b0, start_x[3:0]}), .segments(HEX0));
 		hex_decoder hex1 (.hex_digit({1'b0, start_y[3:0]}), .segments(HEX1));
@@ -207,7 +207,7 @@ module Draw_Grid_FSM(clk, done, load_p, reset, start_x, start_y, bg_colour, fg_c
 endmodule
 
 
-
+/*
 module draw_yellow_losses(clk, reset, new_loss, start_x, start_y, colour_in, done, x_pos, y_pos, colour_out, draw);
 	input clk;
 	input reset;
@@ -309,7 +309,7 @@ module draw_yellow_losses(clk, reset, new_loss, start_x, start_y, colour_in, don
 		
 endmodule
 
-
+*/
 
 // selector will draw inside of a given grid. The thickness of the boarder will be one pixel wide
 
@@ -337,8 +337,8 @@ module Selector_Drawer_FSM(clk, reset, load_s, start_x, start_y, colour_in, done
 	reg [4:0] x_incr;
 	reg [4:0] y_incr;
 	
-	reg curr_state = WAIT;
-	reg next_state = WAIT;
+	reg [2:0] curr_state = WAIT;
+	reg [2:0] next_state = WAIT;
 	reg wait_one_cycle;
 	parameter WAIT = 3'b000, BOTTOM_BOARDER = 3'b001, LEFT_BOARDER = 3'b011, TOP_BOARDER = 3'b111, RIGHT_BOARDER = 3'b110, DONE = 3'b100;
 
@@ -377,38 +377,39 @@ module Selector_Drawer_FSM(clk, reset, load_s, start_x, start_y, colour_in, done
 			end
 
 			BOTTOM_BOARDER: begin
-				x_pos <= start_x + {5'b00000, x_incr[4:0]};
-				y_pos <= start_y + {4'b0000, y_incr[4:0]}; 
+				x_pos <= start_x + {3'b000, x_incr[4:0]};
+				y_pos <= start_y + {2'b00, y_incr[4:0]}; 
 				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
 				else x_incr <= x_incr - 5'b0001;
 				draw <= 1'b1;
 			end
 
 			LEFT_BOARDER: begin
-				x_pos <= start_x + {5'b00000, x_incr[4:0]};
-				y_pos <= start_y + {4'b0000, y_incr[4:0]}; 
+				x_pos <= start_x + {3'b000, x_incr[4:0]};
+				y_pos <= start_y + {2'b00, y_incr[4:0]}; 
 				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
 				else y_incr <= y_incr - 5'b0001;
 				draw <= 1'b1;
 			end
 
 			TOP_BOARDER: begin
-				x_pos <= start_x + {5'b00000, x_incr[4:0]};
-				y_pos <= start_y + {4'b0000, y_incr[4:0]}; 
+				x_pos <= start_x + {3'b000, x_incr[4:0]};
+				y_pos <= start_y + {2'b00, y_incr[4:0]}; 
 				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
 				else x_incr <= x_incr + 5'b0001;
 				draw <= 1'b1;
 			end
 
 			RIGHT_BOARDER: begin
-				x_pos <= start_x + {5'b00000, x_incr[4:0]};
-				y_pos <= start_y + {4'b0000, y_incr[4:0]}; 
+				x_pos <= start_x + {3'b000, x_incr[4:0]};
+				y_pos <= start_y + {2'b00, y_incr[4:0]}; 
 				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
 				else y_incr <= y_incr + 5'b0001;
 				draw <= 1'b1;
 			end
+			
+			default:;
 
-			DONE: next_state = WAIT;
 		endcase
 		
 	end
@@ -436,6 +437,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 	output reg [4:0] score_y, score_b;	// scores start at 0
 	
 	reg [2:0] fg_colour, bg_colour;
+	reg [3:0] selector_position;
 	//reg player_turn = 0;
 	
 	fg_colour_decoder myfg (.cell_data(fg_colour), .colour(colour2_out));
@@ -446,10 +448,12 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 	// bit[2] -> 0 : black, 1 : white;
 	// bits[1:0] -> 00 : black, 10 : white, 01 : blue, 11 : yellow;
 	reg [47:0] cells; 
+	reg [5:0] cell_index; 
 	
-	assign player_has_input = direction[0] || direction[1] || direction[2] || direction[3];
+	assign player_has_input = |direction;
+	reg [2:0] old_data;
 	
-	reg player_input;
+	reg [1:0] player_input;
 	
 	parameter UP = 2'b00, DOWN = 2'b01, LEFT = 2'b10, RIGHT = 2'b11;
 	
@@ -518,7 +522,16 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 			
 			WAIT_SELECTOR_DONE: next_state = done_s ? WAIT_PLAYER : WAIT_SELECTOR_DONE;
 			
-			WAIT_PLAYER: next_state = player_has_input ? WAIT_PLAYER_UP : WAIT_PLAYER;
+			WAIT_PLAYER: begin
+				// If the switched has been changed from what it previously was, redraw
+				if (selector_position != selector) begin
+					next_state = DRAW_BOARD_0;
+				end
+				
+				else next_state = player_has_input ? WAIT_PLAYER_UP : WAIT_PLAYER;
+				
+			end
+			
 			
 			WAIT_PLAYER_UP: next_state = player_has_input ? WAIT_PLAYER_UP : DO_LOGIC;
 			
@@ -714,6 +727,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 				load_p <= 1'b0;
 				load_s <= 1'b1;
 				bg_colour <= 3'b100; // RED for the selector outline.
+				selector_position = selector;
 				
 				// Figure out what X and Y to draw the selector at
 				case (selector)
@@ -817,7 +831,8 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 						x_out <= 8'b00011110;
 						y_out <= 7'b0111100;
 					end
-				endcase		
+				endcase
+				
 			end
 			
 			WAIT_SELECTOR_DONE: begin
@@ -838,13 +853,338 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 				endcase
 			end
 				
-			DO_LOGIC: load_p <= 1'b0;
-			// GAME LOGIC
-			// TANNER: when you write logic for consuming opponent's figures, add 5'b00001 to score_y if blue figure dies or to score_b if yellow figure dies
+			DO_LOGIC: begin 
+				load_p <= 1'b0;
+				// GAME LOGIC
+				// TANNER: when you write logic for consuming opponent's figures, add 5'b00001 to score_y if blue figure dies or to score_b if yellow figure dies
+				// selector_position has the 0-15 cell highlighted.
 			
+				case (selector)
+					
+					// ROW 0
+					// 0 Black
+					4'b0000: begin
+						// If there is a piece on that cell
+						if (^cells[1:0] == 1'b1) begin
+							if (player_input == DOWN) begin
+								cells[13:12] = cells[1:0];
+								cells[1:0] = 2'b00; // fg is now black
+							end
+							if (player_input == RIGHT) begin
+								cells[4:3] = cells[1:0];
+								cells[1:0] = 2'b00; // fg is now black
+							end
+						end
+					end
+					
+					// 1 White
+					4'b0001: begin
+						// If there is a piece on that cell
+						if (^cells[4:3] == 1'b1) begin
+							if (player_input == DOWN) begin
+								cells[16:15] = cells[4:3];
+								cells[4:3] = 2'b11; // fg is now white
+							end
+							if (player_input == RIGHT) begin
+								cells[7:6] = cells[4:3];
+								cells[4:3] = 2'b11; // fg is now white
+							end
+							if (player_input == LEFT) begin
+								cells[1:0] = cells[4:3];
+								cells[4:3] = 2'b11; // fg is now white
+							end
+						end
+					end
+					
+					// 2 Black
+					4'b0010: begin
+						// If there is a piece on that cell
+						if (^cells[7:6] == 1'b1) begin
+							if (player_input == DOWN) begin
+								cells[19:18] = cells[7:6];
+								cells[7:6] = 2'b00; // fg is now black
+							end
+							if (player_input == RIGHT) begin
+								cells[10:9] = cells[7:6];
+								cells[7:6] = 2'b00; // fg is now black
+							end
+							if (player_input == LEFT) begin
+								cells[4:3] = cells[7:6];
+								cells[7:6] = 2'b00; // fg is now black
+							end
+						end
+					end
+					
+					// 3 White
+					4'b0011: begin
+						// If there is a piece on that cell
+						if (^cells[10:9] == 1'b1) begin
+							if (player_input == DOWN) begin
+								cells[22:21] = cells[10:9];
+								cells[10:9] = 2'b11; // fg is now white
+							end
+							if (player_input == LEFT) begin
+								cells[7:6] = cells[10:9];
+								cells[10:9] = 2'b11; // fg is now white
+							end
+						end
+					end
+					
+					// ROW 1
+					// 4 White
+					4'b0100: begin
+						// If there is a piece on that cell
+						if (^cells[13:12] == 1'b1) begin
+							if (player_input == DOWN) begin
+								cells[25:24] = cells[13:12];
+								cells[13:12] = 2'b11; // fg is now white
+							end
+							if (player_input == RIGHT) begin
+								cells[16:15] = cells[13:12];
+								cells[13:12] = 2'b11; // fg is now white
+							end
+							if (player_input == UP) begin
+								cells[1:0] = cells[13:12];
+								cells[13:12] = 2'b11; // fg is now white
+							end
+						end
+					end
+					
+					// 5 Black
+					4'b0101: begin
+						// If there is a piece on that cell
+						if (^cells[16:15] == 1'b1) begin
+							if (player_input == DOWN) begin
+								cells[28:27] = cells[16:15];
+								cells[16:15] = 2'b00; // fg is now black
+							end
+							if (player_input == RIGHT) begin
+								cells[19:18] = cells[16:15];
+								cells[16:15] = 2'b00; // fg is now black
+							end
+							if (player_input == LEFT) begin
+								cells[13:12] = cells[16:15];
+								cells[16:15] = 2'b00; // fg is now black
+							end
+							if (player_input == UP) begin
+								cells[4:3] = cells[16:15];
+								cells[16:15] = 2'b00; // fg is now black
+							end
+						end
+					end
+					
+					// 6 White
+					4'b0110: begin
+						// If there is a piece on that cell
+						if (^cells[19:18] == 1'b1) begin
+							if (player_input == DOWN) begin
+								cells[25:24] = cells[19:18];
+								cells[31:30] = 2'b11; // fg is now white
+							end
+							if (player_input == RIGHT) begin
+								cells[22:21] = cells[19:18];
+								cells[19:18] = 2'b11; // fg is now white
+							end
+							if (player_input == UP) begin
+								cells[7:6] = cells[19:18];
+								cells[19:18] = 2'b11; // fg is now white
+							end
+							if (player_input == LEFT) begin
+								cells[16:15] = cells[19:18];
+								cells[19:18] = 2'b11; // fg is now white
+							end
+						end
+					end
+										
+					// 7 Black
+					4'b0111: begin
+						// If there is a piece on that cell
+						if (^cells[22:21] == 1'b1) begin
+							if (player_input == DOWN) begin
+								cells[34:33] = cells[22:21];
+								cells[22:21] = 2'b00; // fg is now black
+							end
+							if (player_input == LEFT) begin
+								cells[19:18] = cells[22:21];
+								cells[22:21] = 2'b00; // fg is now black
+							end
+							if (player_input == UP) begin
+								cells[10:9] = cells[22:21];
+								cells[22:21] = 2'b00; // fg is now black
+							end
+						end
+					end
+					
+					// ROW 2
+					// 8 Black
+					4'b1000: begin
+						// If there is a piece on that cell
+						if (^cells[25:24] == 1'b1) begin
+							if (player_input == DOWN) begin
+								cells[34:33] = cells[25:24];
+								cells[37:36] = 2'b00; // fg is now black
+							end
+							if (player_input == RIGHT) begin
+								cells[19:18] = cells[25:24];
+								cells[28:27] = 2'b00; // fg is now black
+							end
+							if (player_input == UP) begin
+								cells[13:12] = cells[25:24];
+								cells[25:24] = 2'b00; // fg is now black
+							end
+						end
+					end
+					
+					// 9 White
+					4'b1001: begin
+						// If there is a piece on that cell
+						if (^cells[28:27] == 1'b1) begin
+							if (player_input == DOWN) begin
+								cells[40:39] = cells[28:27];
+								cells[28:27] = 2'b11; // fg is now white
+							end
+							if (player_input == RIGHT) begin
+								cells[31:30] = cells[28:27];
+								cells[28:27] = 2'b11; // fg is now white
+							end
+							if (player_input == UP) begin
+								cells[16:15] = cells[28:27];
+								cells[28:27] = 2'b11; // fg is now white
+							end
+							if (player_input == LEFT) begin
+								cells[25:24] = cells[28:27];
+								cells[28:27] = 2'b11; // fg is now white
+							end
+						end
+					end
+					
+					// 10 Black
+					4'b1010: begin
+						// If there is a piece on that cell
+						if (^cells[31:30] == 1'b1) begin
+							if (player_input == DOWN) begin
+								cells[43:42] = cells[31:30];
+								cells[31:30] = 2'b00; // fg is now black
+							end
+							if (player_input == RIGHT) begin
+								cells[34:33] = cells[31:30];
+								cells[31:30] = 2'b00; // fg is now black
+							end
+							if (player_input == UP) begin
+								cells[19:18] = cells[31:30];
+								cells[31:30] = 2'b00; // fg is now black
+							end
+							if (player_input == LEFT) begin
+								cells[28:27] = cells[31:30];
+								cells[31:30] = 2'b00; // fg is now black
+							end
+						end
+					end
+					
+					// 11 White
+					4'b1011: begin
+						// If there is a piece on that cell
+						if (^cells[34:33] == 1'b1) begin
+							if (player_input == DOWN) begin
+								cells[22:21] = cells[34:33];
+								cells[34:33] = 2'b11; // fg is now white
+							end
+							if (player_input == UP) begin
+								cells[46:45] = cells[34:33];
+								cells[34:33] = 2'b11; // fg is now white
+							end
+							if (player_input == LEFT) begin
+								cells[31:30] = cells[34:33];
+								cells[34:33] = 2'b11; // fg is now white
+							end
+						end
+					end
+					
+					// ROW 3
+					// 12 White
+					4'b1100: begin
+						// If there is a piece on that cell
+						if (^cells[37:36] == 1'b1) begin
+							if (player_input == UP) begin
+								cells[25:24] = cells[37:36];
+								cells[37:36] = 2'b11; // fg is now white
+							end
+							if (player_input == RIGHT) begin
+								cells[40:39] = cells[37:36];
+								cells[37:36] = 2'b11; // fg is now white
+							end
+						end
+					end
+					
+					// 13 Black
+					4'b1011: begin
+						// If there is a piece on that cell
+						if (^cells[40:39] == 1'b1) begin
+							if (player_input == RIGHT) begin
+								cells[43:42] = cells[40:39];
+								cells[40:39] = 2'b00; // fg is now black
+							end
+							if (player_input == UP) begin
+								cells[28:27] = cells[40:39];
+								cells[40:39] = 2'b00; // fg is now black
+							end
+							if (player_input == LEFT) begin
+								cells[37:36] = cells[40:39];
+								cells[40:39] = 2'b00; // fg is now black
+							end
+						end
+					end
+					
+					// 14 White
+					4'b1110: begin
+						// If there is a piece on that cell
+						if (^cells[43:42] == 1'b1) begin
+							if (player_input == UP) begin
+								cells[31:30] = cells[43:42];
+								cells[43:42] = 2'b11; // fg is now white
+							end
+							if (player_input == RIGHT) begin
+								cells[46:45] = cells[43:42];
+								cells[43:42] = 2'b11; // fg is now white
+							end
+							if (player_input == LEFT) begin
+								cells[40:39] = cells[43:42];
+								cells[43:42] = 2'b11; // fg is now white
+							end
+						end
+					end
+					
+					// 15 Black
+					4'b1111: begin
+						// If there is a piece on that cell
+						if (^cells[46:45] == 1'b1) begin
+							if (player_input == LEFT) begin
+								cells[43:42] = cells[46:45];
+								cells[46:45] = 2'b00; // fg is now black
+							end
+							if (player_input == UP) begin
+								cells[34:33] = cells[46:45];
+								cells[46:45] = 2'b00; // fg is now black
+							end
+						end
+					end
+					
+					default: ;
+				
+				endcase
+				
+				
+				
+				
+				
+				
+				
+			
+			end
 
 			default:
-				next_state <= RESET;
+				next_state 
+				<= RESET;
 				
 		endcase
 		
@@ -864,7 +1204,6 @@ module bg_colour_decoder(cell_data, colour);
 
 	input [2:0] cell_data;
 	output reg [2:0] colour;
-	
 	always@(*) begin
 		case (cell_data)
 			// White
@@ -904,15 +1243,17 @@ module fg_colour_decoder(cell_data, colour);
 endmodule	
 
 
-module pixel_drawing_MUX(s, colour_in, x_in, y_in, colour_out, x_out, y_out);
+module pixel_drawing_MUX(s, draw_enable, colour_in, x_in, y_in, colour_out, x_out, y_out, enable);
 	input s; // s==0 means we draw a grid, s==1 means we draw the red selector outline
 	input [5:0] colour_in;	// [5:3] = grid_color, [2:0] = selector_color
 	input [15:0] x_in;	// [15:8] = grid x, [7:0] = selector x
 	input [13:0] y_in;	// [13:7] = grid y, [6:0] = selector y
+	input [1:0] draw_enable; 	// [1] is grid, [0] selector
 
-	reg [2:0] colour_out;
-	reg [7:0] x_out;
-	reg [6:0] y_out;
+	output reg [2:0] colour_out;
+	output reg [7:0] x_out;
+	output reg [6:0] y_out;
+	output reg enable;
 
 	always @(*) begin
 		case (s)
@@ -920,11 +1261,13 @@ module pixel_drawing_MUX(s, colour_in, x_in, y_in, colour_out, x_out, y_out);
 				colour_out <= colour_in[5:3];
 				x_out <= x_in[15:8];
 				y_out <= y_in[13:7];
+				enable <= draw_enable[1];
 				end
-			1'b1: begin
+			1'b1: begin							// case: selector
 				colour_out <= colour_in[2:0];
 				x_out <= x_in[7:0];
 				y_out <= y_in[6:0];
+				enable <= draw_enable[0];
 				end
 		endcase
 	end
