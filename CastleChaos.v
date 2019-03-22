@@ -73,6 +73,7 @@ module CastleChaos
 		
 		wire load_p, load_s;
 		wire done_p, done_s;
+		wire draw_grid, draw_selector;
 		wire [2:0] grid_colour, selector_colour;
 		wire [7:0] start_x, x_grid, x_selector;
 		wire [6:0] start_y, y_grid, y_selector;
@@ -81,11 +82,12 @@ module CastleChaos
 		wire s; // s==0 means we are drawing a grid, s==1 means we are drawing a red selector outline
 		wire writeEn;
 		wire [5:0] state;
+		wire [5:0] sofia_state;
 		
 		// instantiate all the modules we wrote for this game
 		Draw_Grid_FSM grid_drawer(.clk(CLOCK_50), .done(done_p), .load_p(load_p), .reset(~resetn), .start_x(start_x), .start_y(start_y), .bg_colour(bg_colour), .fg_colour(fg_colour), .x_pos(x_grid), .y_pos(y_grid), .colour_out(grid_colour), .draw(draw_grid));
-		Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .start_x(start_x), .start_y(start_y), .colour_in(bg_colour), .done(done_s), .x_pos(x_selector), .y_pos(y_selector), .colour_out(selector_colour), .draw(draw_selector));
-		game_controller_fsm main(.load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(bg_colour), .colour2_out(fg_colour), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(KEY[3:0]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state), .s(s), .score_y(score_y), .score_b(score_b));
+		Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .start_x(start_x), .start_y(start_y), .colour_in(bg_colour), .done(done_s), .x_pos(x_selector), .y_pos(y_selector), .colour_out(selector_colour), .draw(draw_selector), .hex_state(sofia_state));
+		game_controller_fsm main(.confirm(SW[16]), .load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(bg_colour), .colour2_out(fg_colour), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(SW[7:4]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state), .s(s), .score_y(score_y), .score_b(score_b));
 		// contract: grid data comes first, then selector data
 		pixel_drawing_MUX mux(.s(s), .draw_enable({draw_grid, draw_selector}), .colour_in({grid_colour, selector_colour}), .x_in({x_grid, x_selector}), .y_in({y_grid, y_selector}), .colour_out(colour), .x_out(x), .y_out(y), .enable(writeEn));
 		// these are for debugging
@@ -313,7 +315,7 @@ endmodule
 
 // selector will draw inside of a given grid. The thickness of the boarder will be one pixel wide
 
-module Selector_Drawer_FSM(clk, reset, load_s, start_x, start_y, colour_in, done, x_pos, y_pos, colour_out, draw);
+module Selector_Drawer_FSM(clk, reset, load_s, start_x, start_y, colour_in, done, x_pos, y_pos, colour_out, draw, hex_state);
 
 	input clk;
 	input reset;
@@ -328,6 +330,7 @@ module Selector_Drawer_FSM(clk, reset, load_s, start_x, start_y, colour_in, done
 	output [2:0] colour_out;
 	assign colour_out = colour_in;
 	output reg draw;
+	output reg [5:0] hex_state;
 
 
 	// this signals when the module finished drawing the current grid to the screen
@@ -345,15 +348,15 @@ module Selector_Drawer_FSM(clk, reset, load_s, start_x, start_y, colour_in, done
 	// this determines the next state
 	always@(*) begin
 		case(curr_state)
-			WAIT: next_state = load_s ? TOP_BOARDER : WAIT;
+			WAIT: next_state = load_s ? BOTTOM_BOARDER : WAIT;
 			// X counter reached 0, Y stayed at 25
-			BOTTOM_BOARDER: next_state = ((x_incr == 5'b00000) && (y_incr == 5'b11001)) ? LEFT_BOARDER : BOTTOM_BOARDER;
+			BOTTOM_BOARDER: next_state = ((x_incr == 5'b00000) && (y_incr == 5'b11000)) ? LEFT_BOARDER : BOTTOM_BOARDER;
 			// Y counter reached 0, X stayed at 0
-			LEFT_BOARDER: next_state = ((x_incr == 5'b00000) && (y_incr == 5'b00000)) ? TOP_BOARDER : LEFT_BOARDER;
+			LEFT_BOARDER: next_state = ((y_incr == 5'b00000)) ? TOP_BOARDER : LEFT_BOARDER;
 			// X counter went back up to 25, Y stayed at 0
-			TOP_BOARDER: next_state = ((x_incr == 5'b11001) && (y_incr == 5'b00000)) ? RIGHT_BOARDER : TOP_BOARDER;
+			TOP_BOARDER: next_state = ((x_incr == 5'b11000)) ? RIGHT_BOARDER : TOP_BOARDER;
 			// Y counter went back up to 25, X stayed at 25
-			RIGHT_BOARDER: next_state = ((x_incr == 5'b11001) && (y_incr == 5'b11001)) ? DONE : RIGHT_BOARDER;
+			RIGHT_BOARDER: next_state = ((y_incr == 5'b11000)) ? DONE : RIGHT_BOARDER;
 			DONE: next_state = WAIT;
 		endcase
 	end
@@ -361,6 +364,7 @@ module Selector_Drawer_FSM(clk, reset, load_s, start_x, start_y, colour_in, done
 	
 	always @(posedge clk) begin	
 		curr_state = next_state;
+		hex_state <= curr_state;
    end
 
 
@@ -371,21 +375,21 @@ module Selector_Drawer_FSM(clk, reset, load_s, start_x, start_y, colour_in, done
 			WAIT: begin 
 				done <= 1'b0;
 				// each counter starts at 25: boarder is drawn on the interior pixel of a single grid
-				x_incr <= 5'b11001;
-				y_incr <= 5'b11001;
+				x_incr <= 5'b11000;
+				y_incr <= 5'b11000;
 				draw <= 1'b0;
 			end
 
 			BOTTOM_BOARDER: begin
 				x_pos <= start_x + {3'b000, x_incr[4:0]};
-				y_pos <= start_y + {2'b00, y_incr[4:0]}; 
+				y_pos <= start_y + 7'b0011000; 
 				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
 				else x_incr <= x_incr - 5'b0001;
 				draw <= 1'b1;
 			end
 
 			LEFT_BOARDER: begin
-				x_pos <= start_x + {3'b000, x_incr[4:0]};
+				x_pos <= start_x;
 				y_pos <= start_y + {2'b00, y_incr[4:0]}; 
 				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
 				else y_incr <= y_incr - 5'b0001;
@@ -394,21 +398,26 @@ module Selector_Drawer_FSM(clk, reset, load_s, start_x, start_y, colour_in, done
 
 			TOP_BOARDER: begin
 				x_pos <= start_x + {3'b000, x_incr[4:0]};
-				y_pos <= start_y + {2'b00, y_incr[4:0]}; 
+				y_pos <= start_y; 
 				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
 				else x_incr <= x_incr + 5'b0001;
 				draw <= 1'b1;
 			end
 
 			RIGHT_BOARDER: begin
-				x_pos <= start_x + {3'b000, x_incr[4:0]};
+				x_pos <= start_x + 7'b0011000;
 				y_pos <= start_y + {2'b00, y_incr[4:0]}; 
 				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
 				else y_incr <= y_incr + 5'b0001;
 				draw <= 1'b1;
 			end
 			
-			default:;
+			DONE: begin
+				done <= 1'b1;
+				draw <= 1'b0;
+				end
+			
+			default: draw <= 1'b0;
 
 		endcase
 		
@@ -421,12 +430,13 @@ endmodule
 	//		([56:80], [11:35]); 	([106:130], [11:35]);		([31:55], [36:60]);		([81:105], [36:60]);
 	//		([56:80], [61:85]);		([106:130], [61:85]);		([31:55], [86:110]);	([81:105], [86:110]);
 
-module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_out, done_p, done_s, selector, direction, clk, reset, hex_state, s, score_y, score_b);
+module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, colour2_out, done_p, done_s, selector, direction, clk, reset, hex_state, s, score_y, score_b);
 
 	input [3:0] selector; // Changes the cell the selector is on
 	input [3:0] direction; // Tries to move the selected peice up, down, left, right
 	input done_p, done_s; // Signals for when the other fsm's are done thier drawing.
 	input clk, reset; // Clk is clock, and reset resets.
+	input confirm;
 	
 	output reg load_p, load_s; // The signals given to the piece_drawer_fsm and selector_drawer_fsm
 	output reg [7:0] x_out; // X and Y are the top left corner of what ever we want to draw
@@ -438,6 +448,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 	
 	reg [2:0] fg_colour, bg_colour;
 	reg [3:0] selector_position;
+	//wire player_has_input;
 	//reg player_turn = 0;
 	
 	fg_colour_decoder myfg (.cell_data(fg_colour), .colour(colour2_out));
@@ -450,7 +461,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 	reg [47:0] cells; 
 	reg [5:0] cell_index; 
 	
-	assign player_has_input = |direction;
+	//assign player_has_input = direction[3] | direction[2] | direction[1] | direction[0];
 	reg [2:0] old_data;
 	
 	reg [1:0] player_input;
@@ -516,7 +527,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 			DRAW_BOARD_14: next_state = WAIT_BOARD_14;
 			WAIT_BOARD_14: next_state = done_p ? DRAW_BOARD_15 : WAIT_BOARD_14;
 			DRAW_BOARD_15: next_state = WAIT_BOARD_15;
-			WAIT_BOARD_15: next_state = done_p ? WAIT_PLAYER : WAIT_BOARD_15;
+			WAIT_BOARD_15: next_state = done_p ? DRAW_SELECTOR : WAIT_BOARD_15;
 			
 			DRAW_SELECTOR: next_state = WAIT_SELECTOR_DONE;
 			
@@ -524,16 +535,12 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 			
 			WAIT_PLAYER: begin
 				// If the switched has been changed from what it previously was, redraw
-				if (selector_position != selector) begin
-					next_state = DRAW_BOARD_0;
-				end
-				
-				else next_state = player_has_input ? WAIT_PLAYER_UP : WAIT_PLAYER;
-				
+				if (selector_position != selector) next_state = DRAW_BOARD_0;
+				else next_state = (confirm == 1'b1) ? WAIT_PLAYER_UP : WAIT_PLAYER;
+				//else next_state = (direction != 4'b0000) ? WAIT_PLAYER_UP : WAIT_PLAYER;
 			end
 			
-			
-			WAIT_PLAYER_UP: next_state = player_has_input ? WAIT_PLAYER_UP : DO_LOGIC;
+			WAIT_PLAYER_UP: next_state = (confirm == 1'b0) ? DO_LOGIC : WAIT_PLAYER_UP;
 			
 			DO_LOGIC: next_state = DRAW_BOARD_0;
 		endcase
@@ -663,7 +670,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 			end
 			DRAW_BOARD_10: begin
 				bg_colour <= cells[32:30];
-				fg_colour <= cells[32:30];			
+				fg_colour <= cells[32:30];
 				load_p <= 1'b1;
 				x_out <= 8'b01010000;
 				y_out <= 7'b0111100;
@@ -681,7 +688,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 			WAIT_BOARD_11: begin
 				load_p <= 1'b0;
 			end
-			DRAW_BOARD_12: begin 
+			DRAW_BOARD_12: begin
 				bg_colour <= cells[38:36];
 				fg_colour <= cells[38:36];			
 				load_p <= 1'b1;
@@ -721,7 +728,6 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 			WAIT_BOARD_15: begin
 				load_p <= 1'b0;
 			end
-			
 			DRAW_SELECTOR: begin
 				s <= 1'b1; 					// start drawing the selector
 				load_p <= 1'b0;
@@ -745,7 +751,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 					
 					// 2
 					4'b0010: begin
-						x_out <= 8'b00110111;
+						x_out <= 8'b01010000;
 						y_out <= 7'b0001011;
 					end
 					
@@ -769,7 +775,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 					
 					// 6
 					4'b0110: begin
-						x_out <= 8'b00110111;
+						x_out <= 8'b01010000;
 						y_out <= 7'b0100011;
 					end
 					
@@ -793,7 +799,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 					
 					// 10
 					4'b1010: begin
-						x_out <= 8'b00110111;
+						x_out <= 8'b01010000;
 						y_out <= 7'b0111100;
 					end
 					
@@ -817,7 +823,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 					
 					// 14
 					4'b1110: begin
-						x_out <= 8'b00110111;
+						x_out <= 8'b01010000;
 						y_out <= 7'b1010101;
 					end
 					
@@ -837,11 +843,13 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 			
 			WAIT_SELECTOR_DONE: begin
 				load_p <= 1'b0;
-				load_s <= 1'b0;
+				load_s <= 1'b1;
 			end 
 			
-			WAIT_PLAYER: load_p <= 1'b0;
-			
+			WAIT_PLAYER: begin
+				load_p <= 1'b0;
+				load_s <= 1'b0;
+			end
 			WAIT_PLAYER_UP: begin
 				load_p <= 1'b0;
 				case (direction)
@@ -1117,7 +1125,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 					end
 					
 					// 13 Black
-					4'b1011: begin
+					4'b1101: begin
 						// If there is a piece on that cell
 						if (^cells[40:39] == 1'b1) begin
 							if (player_input == RIGHT) begin
@@ -1158,7 +1166,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 					4'b1111: begin
 						// If there is a piece on that cell
 						if (^cells[46:45] == 1'b1) begin
-							if (player_input == LEFT) begin
+							if (player_input== LEFT) begin
 								cells[43:42] = cells[46:45];
 								cells[46:45] = 2'b00; // fg is now black
 							end
@@ -1169,22 +1177,14 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 						end
 					end
 					
-					default: ;
-				
 				endcase
 				
-				
-				
-				
-				
-				
-				
+					
 			
 			end
 
 			default:
-				next_state 
-				<= RESET;
+				next_state <= RESET;
 				
 		endcase
 		
@@ -1195,7 +1195,7 @@ module game_controller_fsm (load_p, load_s, x_out, y_out, colour1_out, colour2_o
 	always @(posedge clk) begin
 		 // Should restart
 		curr_state <= next_state;
-		hex_state <= curr_state;
+		hex_state <= {2'b00, player_input};
 	end	
 
 endmodule
@@ -1264,7 +1264,7 @@ module pixel_drawing_MUX(s, draw_enable, colour_in, x_in, y_in, colour_out, x_ou
 				enable <= draw_enable[1];
 				end
 			1'b1: begin							// case: selector
-				colour_out <= colour_in[2:0];
+				colour_out <= 3'b100;
 				x_out <= x_in[7:0];
 				y_out <= y_in[6:0];
 				enable <= draw_enable[0];
