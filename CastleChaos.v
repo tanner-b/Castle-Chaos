@@ -87,7 +87,7 @@ module CastleChaos
 		
 		// instantiate all the modules we wrote for this game
 		Draw_Grid_FSM grid_drawer(.clk(CLOCK_50), .done(done_p), .load_p(load_p), .reset(~resetn), .start_x(start_x), .start_y(start_y), .bg_colour(bg_colour), .fg_colour(fg_colour), .x_pos(x_grid), .y_pos(y_grid), .colour_out(grid_colour), .draw(draw_grid));
-		Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .draw_x(wrong_selector), .start_x(start_x), .start_y(start_y), .colour_in(bg_colour), .done(done_s), .x_pos(x_selector), .y_pos(y_selector), .colour_out(selector_colour), .draw(draw_selector), .hex_state(sofia_state));
+		Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .selector_x(wrong_selector), .start_x(start_x), .start_y(start_y), .colour_in(bg_colour), .done(done_s), .x_pos(x_selector), .y_pos(y_selector), .colour_out(selector_colour), .draw(draw_selector), .hex_state(sofia_state));
 		game_controller_fsm main(.confirm(SW[16]), .load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(bg_colour), .colour2_out(fg_colour), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(SW[7:4]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state), .s(s), .score_y(score_y), .score_b(score_b), .selector_x(wrong_selector));
 		// contract: grid data comes first, then selector data
 		pixel_drawing_MUX mux(.s(s), .draw_enable({draw_grid, draw_selector}), .colour_in({grid_colour, selector_colour}), .x_in({x_grid, x_selector}), .y_in({y_grid, y_selector}), .colour_out(colour), .x_out(x), .y_out(y), .enable(writeEn));
@@ -213,12 +213,12 @@ endmodule
 
 // selector will draw inside of a given grid. The thickness of the boarder will be one pixel wide
 
-module Selector_Drawer_FSM(clk, reset, load_s, draw_x, start_x, start_y, colour_in, done, x_pos, y_pos, colour_out, draw, hex_state);
+module Selector_Drawer_FSM(clk, reset, load_s, selector_x, start_x, start_y, colour_in, done, x_pos, y_pos, colour_out, draw, hex_state);
 
 	input clk;
 	input reset;
 	input load_s;
-	input draw_x;
+	input selector_x;
 	input [7:0] start_x;
 	input [6:0] start_y;
 	input [2:0] colour_in;
@@ -255,10 +255,10 @@ module Selector_Drawer_FSM(clk, reset, load_s, draw_x, start_x, start_y, colour_
 			// X counter went back up to 25, Y stayed at 0
 			TOP_BOARDER: next_state = ((x_incr == 5'b11000)) ? RIGHT_BOARDER : TOP_BOARDER;
 			// Y counter went back up to 25, X stayed at 25
-			RIGHT_BOARDER: if (draw_x == 1'b0) next_state = (y_incr == 5'b11000) ? DONE : RIGHT_BOARDER;
+			RIGHT_BOARDER: if (selector_x == 1'b0) next_state = (y_incr == 5'b11000) ? DONE : RIGHT_BOARDER;
 							else next_state =  (y_incr == 5'b11000) ? X_a : RIGHT_BOARDER;
-			X_a: next_state = ((x_incr == 5'b00000) && (y_incr == 5'b00000)) ? X_b : X_a;
-			X_b: next_state = ((x_incr == 5'b11000) && (y_incr == 5'b00000)) ? X_a : X_b;
+			X_a: next_state = (y_incr == 5'b00000) ? X_b : X_a;     // we modify x_inc upon finishinig
+			X_b: next_state = (y_incr == 5'b11000) ? DONE : X_b;    // we modify x_inc upon finishinig again
 			DONE: next_state = WAIT;
 		endcase
 	end
@@ -315,10 +315,26 @@ module Selector_Drawer_FSM(clk, reset, load_s, draw_x, start_x, start_y, colour_
 			end
 
 			X_a: begin	// we are currently at bottom right position of the grid
+				x_pos <= start_x + {3'b000, x_incr[4:0]};
+				y_pos <= start_y + {2'b00, y_incr[4:0]}; 
+				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
+				else begin
+                    y_incr <= y_incr - 5'b0001;
+                    x_incr <= x_incr - 5'b0001;
+                end
+                if (x_incr == 5'b00000) x_incr <= 5'b11000;     // bring curr pos to top right
 			end
 
-			Y_a: begin	// we are at top left corner. X approaches 11000, Y approaches 00000
-			end
+			X_b: begin	// we are at top left corner. X approaches 11000, Y approaches 00000
+				x_pos <= start_x + {3'b000, x_incr[4:0]};
+				y_pos <= start_y + {2'b00, y_incr[4:0]}; 
+				if (wait_one_cycle == 1'b1) wait_one_cycle = 1'b0;
+				else begin
+                    y_incr <= y_incr + 5'b0001;
+                    x_incr <= x_incr - 5'b0001;
+                end
+                if (x_incr == 5'b00000) x_incr <= 5'b11000;     // bring back to initial starting point
+			end                                                 // (bottom right)
 			
 			DONE: begin
 				done <= 1'b1;
