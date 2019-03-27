@@ -317,7 +317,7 @@ module Selector_Drawer_FSM(clk, reset, load_s, draw_x, start_x, start_y, colour_
 			X_a: begin	// we are currently at bottom right position of the grid
 			end
 
-			Y_a: begin	// we are at top left corner. X approaches 11000, Y approaches 00000
+			X_b: begin	// we are at top left corner. X approaches 11000, Y approaches 00000
 			end
 			
 			DONE: begin
