@@ -88,7 +88,7 @@ module CastleChaos
 		// instantiate all the modules we wrote for this game
 		Draw_Grid_FSM grid_drawer(.clk(CLOCK_50), .done(done_p), .load_p(load_p), .reset(~resetn), .start_x(start_x), .start_y(start_y), .bg_colour(bg_colour), .fg_colour(fg_colour), .x_pos(x_grid), .y_pos(y_grid), .colour_out(grid_colour), .draw(draw_grid));
 		Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .selector_x(wrong_selector), .start_x(start_x), .start_y(start_y), .colour_in(bg_colour), .done(done_s), .x_pos(x_selector), .y_pos(y_selector), .colour_out(selector_colour), .draw(draw_selector), .hex_state(sofia_state));
-		game_controller_fsm main(.confirm(SW[16]), .load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(bg_colour), .colour2_out(fg_colour), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(SW[7:4]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state), .s(s), .score_y(score_y), .score_b(score_b), .selector_x(wrong_selector));
+		game_controller_fsm main(.confirm(~KEY[0]), .load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(bg_colour), .colour2_out(fg_colour), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(SW[7:4]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state), .s(s), .score_y(score_y), .score_b(score_b), .selector_x(wrong_selector));
 		// contract: grid data comes first, then selector data
 		pixel_drawing_MUX mux(.s(s), .draw_enable({draw_grid, draw_selector}), .colour_in({grid_colour, selector_colour}), .x_in({x_grid, x_selector}), .y_in({y_grid, y_selector}), .colour_out(colour), .x_out(x), .y_out(y), .enable(writeEn));
 		// these are for debugging
@@ -98,7 +98,7 @@ module CastleChaos
 		hex_decoder hex3 (.hex_digit({3'b000, state[5:4]}), .segments(HEX3));
 		// these keep track of score
 		hex_decoder hex4 (.hex_digit(score_b), .segments(HEX4));	// score blue
-		hex_decoder hex5 (.hex_digit(5'hB), .segments(HEX5));		// label b
+		hex_decoder hex5 (.hex_digit(5'b01011), .segments(HEX5));		// label b
 		hex_decoder hex6 (.hex_digit(score_y), .segments(HEX6));	// score yellow
 		hex_decoder hex7 (.hex_digit(5'b10000), .segments(HEX7));	// Label y
 
