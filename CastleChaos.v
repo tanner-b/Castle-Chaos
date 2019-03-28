@@ -111,13 +111,13 @@ endmodule
 //		- if there is no figure on that grid, this colour will either be black or white, depending on its location
 // 	- the outer rim which surrounds the figure. This part can only be black or white, depenging on the grid'd location (bg)
 
-//	+---------------+
-//	|	bg			|		bg options: black, white
-//	|	+-------+	|
-//	|	|	fg	|	|		fg options: black, white, blue, yellow
-//	|	+-------+	|
-//	|				|
-//	+---------------+
+//	+-----------------+
+//	|       bg        |		bg options: black, white
+//	|    +-------+    |
+//	|    |  fg   |    |    fg options: black, white, blue, yellow
+//	|    +-------+    |
+//	|                 |
+//	+-----------------+
 
 module Draw_Grid_FSM(clk, done, load_p, reset, start_x, start_y, bg_colour, fg_colour, x_pos, y_pos, colour_out, draw);
 // this module can draw a box of any size based on input. Largest box we may need is 25x25,
@@ -369,12 +369,12 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 	output reg [5:0] hex_state;
 	output reg s; // s==0 means we draw a grid, s==1 means we draw the red selector outline
 	output reg [4:0] score_y, score_b;	// scores start at 0
-	output reg selector_x;																			// 	NEW ADDITION: TANNER
+	output reg selector_x = 0;																			// 	NEW ADDITION: TANNER
 	
 	reg [2:0] fg_colour, bg_colour;
 	reg [3:0] selector_position;
 	//wire player_has_input;
-	//reg player_turn = 0;
+	reg player_turn = 0;
 	
 	fg_colour_decoder myfg (.cell_data(fg_colour), .colour(colour2_out));
 	bg_colour_decoder mybg (.cell_data(bg_colour), .colour(colour1_out));
@@ -490,6 +490,7 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 				y_out <= 7'b0000000;
 				score_y <= 5'b00000;		// initialize both scores to 0
 				score_b <= 5'b00000;		
+				selector_x = 0;
 			end
 						
 			DRAW_BOARD_0: begin
@@ -774,6 +775,7 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 			WAIT_PLAYER: begin
 				load_p <= 1'b0;
 				load_s <= 1'b0;
+				selector_x = 0;
 			end
 			WAIT_PLAYER_UP: begin
 				load_p <= 1'b0;
@@ -798,7 +800,7 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 					// 0 Black
 					4'b0000: begin
 						// If there is a piece on that cell
-						if (^cells[1:0] == 1'b1) begin
+						if (((cells[1:0] == 2'b10) && (player_turn == 0)) || ((cells[1:0] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == DOWN) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[1:0] == 2'b01) && (cells [13:12] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -816,12 +818,14 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[1:0] = 2'b00; // fg is now black
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// 1 White
 					4'b0001: begin
 						// If there is a piece on that cell
-						if (^cells[4:3] == 1'b1) begin
+						if (((cells[4:3] == 2'b10) && (player_turn == 0)) || ((cells[4:3] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == DOWN) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[4:3] == 2'b01) && (cells [16:15] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -847,12 +851,14 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[4:3] = 2'b11; // fg is now white
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// 2 Black
 					4'b0010: begin
 						// If there is a piece on that cell
-						if (^cells[7:6] == 1'b1) begin
+						if (((cells[7:6] == 2'b10) && (player_turn == 0)) || ((cells[7:6] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == DOWN) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[7:6] == 2'b01) && (cells [19:18] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -878,12 +884,14 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[7:6] = 2'b00; // fg is now black
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// 3 White
 					4'b0011: begin
 						// If there is a piece on that cell
-						if (^cells[10:9] == 1'b1) begin
+						if (((cells[10:9] == 2'b10) && (player_turn == 0)) || ((cells[10:9] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == DOWN) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[10:9] == 2'b01) && (cells [22:21] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -901,13 +909,15 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[10:9] = 2'b11; // fg is now white
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// ROW 1
 					// 4 White
 					4'b0100: begin
 						// If there is a piece on that cell
-						if (^cells[13:12] == 1'b1) begin
+						if (((cells[13:12] == 2'b10) && (player_turn == 0)) || ((cells[13:12] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == DOWN) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[13:12] == 2'b01) && (cells [25:24] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -933,12 +943,14 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[13:12] = 2'b11; // fg is now white
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// 5 Black
 					4'b0101: begin
 						// If there is a piece on that cell
-						if (^cells[16:15] == 1'b1) begin
+						if (((cells[16:15] == 2'b10) && (player_turn == 0)) || ((cells[16:15] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == DOWN) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[16:15] == 2'b01) && (cells [28:27] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -972,12 +984,14 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[16:15] = 2'b00; // fg is now black
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// 6 White
 					4'b0110: begin
 						// If there is a piece on that cell
-						if (^cells[19:18] == 1'b1) begin
+						if (((cells[19:18] == 2'b10) && (player_turn == 0)) || ((cells[19:18] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == DOWN) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[19:18] == 2'b01) && (cells [31:30] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -1011,12 +1025,14 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[19:18] = 2'b11; // fg is now white
 							end
 						end
+						else
+							selector_x = 1;
 					end
 										
 					// 7 Black
 					4'b0111: begin
 						// If there is a piece on that cell
-						if (^cells[22:21] == 1'b1) begin
+						if (((cells[22:21] == 2'b10) && (player_turn == 0)) || ((cells[22:21] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == DOWN) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[22:21] == 2'b01) && (cells [34:33] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -1042,13 +1058,15 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[22:21] = 2'b00; // fg is now black
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// ROW 2
 					// 8 Black
 					4'b1000: begin
 						// If there is a piece on that cell
-						if (^cells[25:24] == 1'b1) begin
+						if (((cells[25:24] == 2'b10) && (player_turn == 0)) || ((cells[25:24] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == DOWN) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[25:24] == 2'b01) && (cells [37:36] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -1074,12 +1092,14 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[25:24] = 2'b00; // fg is now black
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// 9 White
 					4'b1001: begin
 						// If there is a piece on that cell
-						if (^cells[28:27] == 1'b1) begin
+						if (((cells[28:27] == 2'b10) && (player_turn == 0)) || ((cells[28:27] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == DOWN) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[28:27] == 2'b01) && (cells [40:39] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -1113,12 +1133,14 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[28:27] = 2'b11; // fg is now white
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// 10 Black
 					4'b1010: begin
 						// If there is a piece on that cell
-						if (^cells[31:30] == 1'b1) begin
+						if (((cells[31:30] == 2'b10) && (player_turn == 0)) || ((cells[31:30] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == DOWN) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[31:30] == 2'b01) && (cells [43:42] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -1152,12 +1174,14 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[31:30] = 2'b00; // fg is now black
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// 11 White
 					4'b1011: begin
 						// If there is a piece on that cell
-						if (^cells[34:33] == 1'b1) begin
+						if (((cells[34:33] == 2'b10) && (player_turn == 0)) || ((cells[34:33] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == DOWN) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[34:33] == 2'b01) && (cells [46:45] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -1183,13 +1207,15 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[34:33] = 2'b11; // fg is now white
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// ROW 3
 					// 12 White
 					4'b1100: begin
 						// If there is a piece on that cell
-						if (^cells[37:36] == 1'b1) begin
+						if (((cells[37:36] == 2'b10) && (player_turn == 0)) || ((cells[37:36] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == UP) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[37:36] == 2'b01) && (cells [25:24] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -1207,12 +1233,14 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[37:36] = 2'b11; // fg is now white
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// 13 Black
 					4'b1101: begin
 						// If there is a piece on that cell
-						if (^cells[40:39] == 1'b1) begin
+						if (((cells[40:39] == 2'b10) && (player_turn == 0)) || ((cells[40:39] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == RIGHT) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[40:39] == 2'b01) && (cells [43:42] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -1238,12 +1266,14 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[40:39] = 2'b00; // fg is now black
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// 14 White
 					4'b1110: begin
 						// If there is a piece on that cell
-						if (^cells[43:42] == 1'b1) begin
+						if (((cells[43:42] == 2'b10) && (player_turn == 0)) || ((cells[43:42] == 2'b01) && (player_turn = 1))) begin
 							if (player_input == UP) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[43:42] == 2'b01) && (cells [31:30] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -1269,12 +1299,14 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[43:42] = 2'b11; // fg is now white
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 					// 15 Black
 					4'b1111: begin
 						// If there is a piece on that cell
-						if (^cells[46:45] == 1'b1) begin
+						if (((cells[46:45] == 2'b10) && (player_turn == 0)) || ((cells[46:45] == 2'b01) && (player_turn = 1))) begin
 							if (player_input== LEFT) begin
 								// if there is a blue piece killing a yellow piece
 								if ((cells[46:45] == 2'b01) && (cells [43:42] == 2'b10)) score_b <= score_b + 5'b00001;
@@ -1292,20 +1324,23 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 								cells[46:45] = 2'b00; // fg is now black
 							end
 						end
+						else
+							selector_x = 1;
 					end
 					
 				endcase
 				
-					
-			
+				// Swtich the player turn as long as it was a valid turn.
+				if (selector_x == 0) begin
+					if (player_turn == 0) player_turn = 1;
+					else player_turn = 0;
+				end
 			end
 
 			default:
 				next_state <= RESET;
 				
 		endcase
-		
-		
 		
 	end
 	
