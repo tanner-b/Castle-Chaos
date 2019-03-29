@@ -84,16 +84,17 @@ module CastleChaos
 		wire wrong_selector;
 		wire [5:0] state;
 		wire [5:0] sofia_state;
+		wire player_turn;
 		
 		// instantiate all the modules we wrote for this game
 		Draw_Grid_FSM grid_drawer(.clk(CLOCK_50), .done(done_p), .load_p(load_p), .reset(~resetn), .start_x(start_x), .start_y(start_y), .bg_colour(bg_colour), .fg_colour(fg_colour), .x_pos(x_grid), .y_pos(y_grid), .colour_out(grid_colour), .draw(draw_grid));
 		Selector_Drawer_FSM selector_drawer(.clk(CLOCK_50), .reset(~resetn), .load_s(load_s), .selector_x(wrong_selector), .start_x(start_x), .start_y(start_y), .colour_in(bg_colour), .done(done_s), .x_pos(x_selector), .y_pos(y_selector), .colour_out(selector_colour), .draw(draw_selector), .hex_state(sofia_state));
-		game_controller_fsm main(.confirm(~KEY[0]), .load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(bg_colour), .colour2_out(fg_colour), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(SW[7:4]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state), .s(s), .score_y(score_y), .score_b(score_b), .selector_x(wrong_selector));
+		game_controller_fsm main(.confirm(~KEY[0]), .load_p(load_p), .load_s(load_s), .x_out(start_x), .y_out(start_y), .colour1_out(bg_colour), .colour2_out(fg_colour), .done_p(done_p), .done_s(done_s), .selector(SW[3:0]), .direction(SW[7:4]), .clk(CLOCK_50), .reset(~resetn), .hex_state(state), .s(s), .score_y(score_y), .score_b(score_b), .selector_x(wrong_selector), .player_turn(player_turn));
 		// contract: grid data comes first, then selector data
 		pixel_drawing_MUX mux(.s(s), .draw_enable({draw_grid, draw_selector}), .colour_in({grid_colour, selector_colour}), .x_in({x_grid, x_selector}), .y_in({y_grid, y_selector}), .colour_out(colour), .x_out(x), .y_out(y), .enable(writeEn));
 		// these are for debugging
-		hex_decoder hex0 (.hex_digit({1'b0, start_x[3:0]}), .segments(HEX0));
-		hex_decoder hex1 (.hex_digit({1'b0, start_y[3:0]}), .segments(HEX1));
+		hex_decoder hex0 (.hex_digit({4'b0000, player_turn}), .segments(HEX0));
+		hex_decoder hex1 (.hex_digit({4'b0000, wrong_selector}), .segments(HEX1));
 		hex_decoder hex2 (.hex_digit({1'b0, state[3:0]}), .segments(HEX2));
 		hex_decoder hex3 (.hex_digit({3'b000, state[5:4]}), .segments(HEX3));
 		// these keep track of score
@@ -354,7 +355,7 @@ endmodule
 	//		([56:80], [11:35]); 	([106:130], [11:35]);		([31:55], [36:60]);		([81:105], [36:60]);
 	//		([56:80], [61:85]);		([106:130], [61:85]);		([31:55], [86:110]);	([81:105], [86:110]);
 
-module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, colour2_out, done_p, done_s, selector, direction, clk, reset, hex_state, s, score_y, score_b, selector_x);
+module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, colour2_out, done_p, done_s, selector, direction, clk, reset, hex_state, s, score_y, score_b, selector_x, player_turn);
 
 	input [3:0] selector; // Changes the cell the selector is on
 	input [3:0] direction; // Tries to move the selected peice up, down, left, right
@@ -369,12 +370,12 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 	output reg [5:0] hex_state;
 	output reg s; // s==0 means we draw a grid, s==1 means we draw the red selector outline
 	output reg [4:0] score_y, score_b;	// scores start at 0
-	output reg selector_x = 0;																			// 	NEW ADDITION: TANNER
+	output reg selector_x;																			// 	NEW ADDITION: TANNER
 	
 	reg [2:0] fg_colour, bg_colour;
 	reg [3:0] selector_position;
 	//wire player_has_input;
-	reg player_turn = 0;
+	output reg player_turn = 0;
 	
 	fg_colour_decoder myfg (.cell_data(fg_colour), .colour(colour2_out));
 	bg_colour_decoder mybg (.cell_data(bg_colour), .colour(colour1_out));
@@ -412,7 +413,24 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 	DRAW_BOARD_15 = 6'b011111, WAIT_BOARD_15 = 6'b100000,	
 	DRAW_SELECTOR = 6'b100001, 
 	WAIT_SELECTOR_DONE = 6'b100010, WAIT_PLAYER = 6'b100011, 
-	WAIT_PLAYER_UP = 6'b100100, DO_LOGIC = 6'b100101;
+	WAIT_PLAYER_UP = 6'b100100, DO_LOGIC = 6'b100101,
+	CLEAN_UP = 6'b100110, 
+	LOGIC_0 = 6'b100111,
+	LOGIC_1 = 6'b101000,
+	LOGIC_2 = 6'b101001,
+	LOGIC_3 = 6'b101010,
+	LOGIC_4 = 6'b101011,
+	LOGIC_5 = 6'b101100,
+	LOGIC_6 = 6'b101101,
+	LOGIC_7 = 6'b101110,
+	LOGIC_8 = 6'b101111,
+	LOGIC_9 = 6'b110000,
+	LOGIC_10 = 6'b110001,
+	LOGIC_11 = 6'b110010,
+	LOGIC_12 = 6'b110011,
+	LOGIC_13 = 6'b110100,
+	LOGIC_14 = 6'b110101,
+	LOGIC_15 = 6'b110110;
 	
 	reg [5:0] curr_state = RESET;
 	reg [5:0] next_state = DRAW_BOARD_0;		  
@@ -467,14 +485,100 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 			
 			WAIT_PLAYER_UP: next_state = (confirm == 1'b0) ? DO_LOGIC : WAIT_PLAYER_UP;
 			
-			DO_LOGIC: next_state = DRAW_BOARD_0;
+			DO_LOGIC: begin 
+				case(selector)
+					4'b0000:
+						next_state = LOGIC_0;
+					4'b0001:
+						next_state = LOGIC_1;
+					4'b0010:
+						next_state = LOGIC_2;
+					4'b0011:
+						next_state = LOGIC_3;
+					4'b0100:
+						next_state = LOGIC_4;
+					4'b0101:
+						next_state = LOGIC_5;
+					4'b0110:
+						next_state = LOGIC_6;
+					4'b0111:
+						next_state = LOGIC_7;
+					4'b1000:
+						next_state = LOGIC_8;
+					4'b1001:
+						next_state = LOGIC_9;
+					4'b1010:
+						next_state = LOGIC_10;
+					4'b1011:
+						next_state = LOGIC_11;
+					4'b1100:
+						next_state = LOGIC_12;
+					4'b1101:
+						next_state = LOGIC_13;
+					4'b1110:
+						next_state = LOGIC_14;
+					4'b1111:
+						next_state = LOGIC_15;
+						
+				endcase
+			end
+			
+			LOGIC_0:
+				next_state = CLEAN_UP;
+			
+			LOGIC_1:
+				next_state = CLEAN_UP;
+			
+			LOGIC_2:
+				next_state = CLEAN_UP;
+			
+			LOGIC_3:
+				next_state = CLEAN_UP;
+			
+			LOGIC_4:
+				next_state = CLEAN_UP;
+			
+			LOGIC_5:
+				next_state = CLEAN_UP;
+			
+			LOGIC_6:
+				next_state = CLEAN_UP;
+			
+			LOGIC_7:
+				next_state = CLEAN_UP;
+			
+			LOGIC_8:
+				next_state = CLEAN_UP;
+			
+			LOGIC_9:
+				next_state = CLEAN_UP;
+			
+			LOGIC_10:
+				next_state = CLEAN_UP;
+			
+			LOGIC_11:
+				next_state = CLEAN_UP;
+			
+			LOGIC_12:
+				next_state = CLEAN_UP;
+			
+			LOGIC_13:
+				next_state = CLEAN_UP;
+			
+			LOGIC_14:
+				next_state = CLEAN_UP;
+			
+			LOGIC_15:
+				next_state = CLEAN_UP;
+						
+			CLEAN_UP: next_state = DRAW_BOARD_0;
 		endcase
 		
 		if(reset == 1'b1)
 			next_state = RESET;
 	end
 	
-	always@(posedge clk)
+	always@(negedge clk)
 	begin: state_table
 		case (curr_state)	
 		
@@ -490,7 +594,8 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 				y_out <= 7'b0000000;
 				score_y <= 5'b00000;		// initialize both scores to 0
 				score_b <= 5'b00000;		
-				selector_x = 0;
+				selector_x <= 1'b0;
+				player_turn <= 1'b0;
 			end
 						
 			DRAW_BOARD_0: begin
@@ -775,8 +880,8 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 			WAIT_PLAYER: begin
 				load_p <= 1'b0;
 				load_s <= 1'b0;
-				selector_x = 0;
 			end
+			
 			WAIT_PLAYER_UP: begin
 				load_p <= 1'b0;
 				case (direction)
@@ -790,550 +895,555 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 				
 			DO_LOGIC: begin 
 				load_p <= 1'b0;
-				// GAME LOGIC
-				// TANNER: when you write logic for consuming opponent's figures, add 5'b00001 to score_y if blue figure dies or to score_b if yellow figure dies
-				// selector_position has the 0-15 cell highlighted.
+			end
 			
-				case (selector)
-					
-					// ROW 0
-					// 0 Black
-					4'b0000: begin
-						// If there is a piece on that cell
-						if (((cells[1:0] == 2'b10) && (player_turn == 0)) || ((cells[1:0] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == DOWN) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[1:0] == 2'b01) && (cells [13:12] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[1:0] == 2'b10) && (cells [13:12] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[13:12] = cells[1:0];
-								cells[1:0] = 2'b00; // fg is now black
-							end
-							if (player_input == RIGHT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[1:0] == 2'b01) && (cells [4:3] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[1:0] == 2'b10) && (cells [4:3] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[4:3] = cells[1:0];
-								cells[1:0] = 2'b00; // fg is now black
-							end
-						end
-						else
-							selector_x = 1;
+			LOGIC_0: begin
+				// If there is a piece on that cell
+				if (((cells[1:0] == 2'b10) && (player_turn == 1'b0)) || ((cells[1:0] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == DOWN) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[1:0] == 2'b01) && (cells [13:12] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[1:0] == 2'b10) && (cells [13:12] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[13:12] = cells[1:0];
+						cells[1:0] = 2'b00; // fg is now black
 					end
-					
-					// 1 White
-					4'b0001: begin
-						// If there is a piece on that cell
-						if (((cells[4:3] == 2'b10) && (player_turn == 0)) || ((cells[4:3] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == DOWN) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[4:3] == 2'b01) && (cells [16:15] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[4:3] == 2'b10) && (cells [16:15] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[16:15] = cells[4:3];
-								cells[4:3] = 2'b11; // fg is now white
-							end
-							if (player_input == RIGHT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[4:3] == 2'b01) && (cells [7:6] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[4:3] == 2'b10) && (cells [7:6] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[7:6] = cells[4:3];
-								cells[4:3] = 2'b11; // fg is now white
-							end
-							if (player_input == LEFT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[4:3] == 2'b01) && (cells [1:0] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[4:3] == 2'b10) && (cells [1:0] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[1:0] = cells[4:3];
-								cells[4:3] = 2'b11; // fg is now white
-							end
-						end
-						else
-							selector_x = 1;
+					else if (player_input == RIGHT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[1:0] == 2'b01) && (cells [4:3] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[1:0] == 2'b10) && (cells [4:3] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[4:3] = cells[1:0];
+						cells[1:0] = 2'b00; // fg is now black
 					end
-					
-					// 2 Black
-					4'b0010: begin
-						// If there is a piece on that cell
-						if (((cells[7:6] == 2'b10) && (player_turn == 0)) || ((cells[7:6] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == DOWN) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[7:6] == 2'b01) && (cells [19:18] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[7:6] == 2'b10) && (cells [19:18] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[19:18] = cells[7:6];
-								cells[7:6] = 2'b00; // fg is now black
-							end
-							if (player_input == RIGHT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[7:6] == 2'b01) && (cells [10:9] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[7:6] == 2'b10) && (cells [10:9] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[10:9] = cells[7:6];
-								cells[7:6] = 2'b00; // fg is now black
-							end
-							if (player_input == LEFT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[7:6] == 2'b01) && (cells [4:3] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[7:6] == 2'b10) && (cells [4:3] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[4:3] = cells[7:6];
-								cells[7:6] = 2'b00; // fg is now black
-							end
-						end
-						else
-							selector_x = 1;
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			LOGIC_1: begin
+				// If there is a piece on that cell
+				if (((cells[4:3] == 2'b10) && (player_turn == 1'b0)) || ((cells[4:3] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == DOWN) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[4:3] == 2'b01) && (cells [16:15] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[4:3] == 2'b10) && (cells [16:15] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[16:15] = cells[4:3];
+						cells[4:3] = 2'b11; // fg is now white
 					end
-					
-					// 3 White
-					4'b0011: begin
-						// If there is a piece on that cell
-						if (((cells[10:9] == 2'b10) && (player_turn == 0)) || ((cells[10:9] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == DOWN) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[10:9] == 2'b01) && (cells [22:21] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[10:9] == 2'b10) && (cells [22:21] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[22:21] = cells[10:9];
-								cells[10:9] = 2'b11; // fg is now white
-							end
-							if (player_input == LEFT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[10:9] == 2'b01) && (cells [7:6] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[10:9] == 2'b10) && (cells [7:6] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[7:6] = cells[10:9];
-								cells[10:9] = 2'b11; // fg is now white
-							end
-						end
-						else
-							selector_x = 1;
+					else if (player_input == RIGHT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[4:3] == 2'b01) && (cells [7:6] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[4:3] == 2'b10) && (cells [7:6] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[7:6] = cells[4:3];
+						cells[4:3] = 2'b11; // fg is now white
 					end
-					
-					// ROW 1
-					// 4 White
-					4'b0100: begin
-						// If there is a piece on that cell
-						if (((cells[13:12] == 2'b10) && (player_turn == 0)) || ((cells[13:12] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == DOWN) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[13:12] == 2'b01) && (cells [25:24] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[13:12] == 2'b10) && (cells [25:24] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[25:24] = cells[13:12];
-								cells[13:12] = 2'b11; // fg is now white
-							end
-							if (player_input == RIGHT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[13:12] == 2'b01) && (cells [16:15] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[13:12] == 2'b10) && (cells [16:15] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[16:15] = cells[13:12];
-								cells[13:12] = 2'b11; // fg is now white
-							end
-							if (player_input == UP) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[13:12] == 2'b01) && (cells [1:0] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[13:12] == 2'b10) && (cells [1:0] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[1:0] = cells[13:12];
-								cells[13:12] = 2'b11; // fg is now white
-							end
-						end
-						else
-							selector_x = 1;
+					else if (player_input == LEFT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[4:3] == 2'b01) && (cells [1:0] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[4:3] == 2'b10) && (cells [1:0] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[1:0] = cells[4:3];
+						cells[4:3] = 2'b11; // fg is now white
 					end
-					
-					// 5 Black
-					4'b0101: begin
-						// If there is a piece on that cell
-						if (((cells[16:15] == 2'b10) && (player_turn == 0)) || ((cells[16:15] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == DOWN) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[16:15] == 2'b01) && (cells [28:27] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[16:15] == 2'b10) && (cells [28:27] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[28:27] = cells[16:15];
-								cells[16:15] = 2'b00; // fg is now black
-							end
-							if (player_input == RIGHT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[16:15] == 2'b01) && (cells [19:18] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[16:15] == 2'b10) && (cells [19:18] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[19:18] = cells[16:15];
-								cells[16:15] = 2'b00; // fg is now black
-							end
-							if (player_input == LEFT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[16:15] == 2'b01) && (cells [13:12] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[16:15] == 2'b10) && (cells [13:12] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[13:12] = cells[16:15];
-								cells[16:15] = 2'b00; // fg is now black
-							end
-							if (player_input == UP) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[16:15] == 2'b01) && (cells [4:3] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[16:15] == 2'b10) && (cells [4:3] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[4:3] = cells[16:15];
-								cells[16:15] = 2'b00; // fg is now black
-							end
-						end
-						else
-							selector_x = 1;
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			LOGIC_2: begin
+				// If there is a piece on that cell
+				if (((cells[7:6] == 2'b10) && (player_turn == 1'b0)) || ((cells[7:6] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == DOWN) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[7:6] == 2'b01) && (cells [19:18] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[7:6] == 2'b10) && (cells [19:18] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[19:18] = cells[7:6];
+						cells[7:6] = 2'b00; // fg is now black
 					end
-					
-					// 6 White
-					4'b0110: begin
-						// If there is a piece on that cell
-						if (((cells[19:18] == 2'b10) && (player_turn == 0)) || ((cells[19:18] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == DOWN) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[19:18] == 2'b01) && (cells [31:30] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[19:18] == 2'b10) && (cells [31:30] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[31:30] = cells[19:18];
-								cells[19:18] = 2'b11; // fg is now white
-							end
-							if (player_input == RIGHT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[19:18] == 2'b01) && (cells [22:21] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[19:18] == 2'b10) && (cells [22:21] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[22:21] = cells[19:18];
-								cells[19:18] = 2'b11; // fg is now white
-							end
-							if (player_input == UP) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[19:18] == 2'b01) && (cells [7:6] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[19:18] == 2'b10) && (cells [7:6] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[7:6] = cells[19:18];
-								cells[19:18] = 2'b11; // fg is now white
-							end
-							if (player_input == LEFT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[19:18] == 2'b01) && (cells [16:15] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[19:18] == 2'b10) && (cells [16:15] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[16:15] = cells[19:18];
-								cells[19:18] = 2'b11; // fg is now white
-							end
-						end
-						else
-							selector_x = 1;
+					else if (player_input == RIGHT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[7:6] == 2'b01) && (cells [10:9] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[7:6] == 2'b10) && (cells [10:9] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[10:9] = cells[7:6];
+						cells[7:6] = 2'b00; // fg is now black
 					end
-										
-					// 7 Black
-					4'b0111: begin
-						// If there is a piece on that cell
-						if (((cells[22:21] == 2'b10) && (player_turn == 0)) || ((cells[22:21] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == DOWN) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[22:21] == 2'b01) && (cells [34:33] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[22:21] == 2'b10) && (cells [34:33] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[34:33] = cells[22:21];
-								cells[22:21] = 2'b00; // fg is now black
-							end
-							if (player_input == LEFT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[22:21] == 2'b01) && (cells [19:18] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[22:21] == 2'b10) && (cells [19:18] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[19:18] = cells[22:21];
-								cells[22:21] = 2'b00; // fg is now black
-							end
-							if (player_input == UP) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[22:21] == 2'b01) && (cells [10:9] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[22:21] == 2'b10) && (cells [10:9] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[10:9] = cells[22:21];
-								cells[22:21] = 2'b00; // fg is now black
-							end
-						end
-						else
-							selector_x = 1;
+					else if (player_input == LEFT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[7:6] == 2'b01) && (cells [4:3] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[7:6] == 2'b10) && (cells [4:3] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[4:3] = cells[7:6];
+						cells[7:6] = 2'b00; // fg is now black
 					end
-					
-					// ROW 2
-					// 8 Black
-					4'b1000: begin
-						// If there is a piece on that cell
-						if (((cells[25:24] == 2'b10) && (player_turn == 0)) || ((cells[25:24] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == DOWN) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[25:24] == 2'b01) && (cells [37:36] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[25:24] == 2'b10) && (cells [37:36] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[37:36] = cells[25:24];
-								cells[25:24] = 2'b00; // fg is now black
-							end
-							if (player_input == RIGHT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[25:24] == 2'b01) && (cells [28:27] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[25:24] == 2'b10) && (cells [28:27] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[28:27] = cells[25:24];
-								cells[25:24] = 2'b00; // fg is now black
-							end
-							if (player_input == UP) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[25:24] == 2'b01) && (cells [13:12] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[25:24] == 2'b10) && (cells [13:12] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[13:12] = cells[25:24];
-								cells[25:24] = 2'b00; // fg is now black
-							end
-						end
-						else
-							selector_x = 1;
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			LOGIC_3: begin
+				// If there is a piece on that cell
+				if (((cells[10:9] == 2'b10) && (player_turn == 1'b0)) || ((cells[10:9] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == DOWN) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[10:9] == 2'b01) && (cells [22:21] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[10:9] == 2'b10) && (cells [22:21] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[22:21] = cells[10:9];
+						cells[10:9] = 2'b11; // fg is now white
 					end
-					
-					// 9 White
-					4'b1001: begin
-						// If there is a piece on that cell
-						if (((cells[28:27] == 2'b10) && (player_turn == 0)) || ((cells[28:27] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == DOWN) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[28:27] == 2'b01) && (cells [40:39] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[28:27] == 2'b10) && (cells [40:39] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[40:39] = cells[28:27];
-								cells[28:27] = 2'b11; // fg is now white
-							end
-							if (player_input == RIGHT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[28:27] == 2'b01) && (cells [31:30] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[28:27] == 2'b10) && (cells [31:30] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[31:30] = cells[28:27];
-								cells[28:27] = 2'b11; // fg is now white
-							end
-							if (player_input == UP) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[28:27] == 2'b01) && (cells [16:15] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[28:27] == 2'b10) && (cells [16:15] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[16:15] = cells[28:27];
-								cells[28:27] = 2'b11; // fg is now white
-							end
-							if (player_input == LEFT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[28:27] == 2'b01) && (cells [25:24] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[28:27] == 2'b10) && (cells [25:24] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[25:24] = cells[28:27];
-								cells[28:27] = 2'b11; // fg is now white
-							end
-						end
-						else
-							selector_x = 1;
+					else if (player_input == LEFT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[10:9] == 2'b01) && (cells [7:6] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[10:9] == 2'b10) && (cells [7:6] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[7:6] = cells[10:9];
+						cells[10:9] = 2'b11; // fg is now white
 					end
-					
-					// 10 Black
-					4'b1010: begin
-						// If there is a piece on that cell
-						if (((cells[31:30] == 2'b10) && (player_turn == 0)) || ((cells[31:30] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == DOWN) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[31:30] == 2'b01) && (cells [43:42] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[31:30] == 2'b10) && (cells [43:42] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[43:42] = cells[31:30];
-								cells[31:30] = 2'b00; // fg is now black
-							end
-							if (player_input == RIGHT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[31:30] == 2'b01) && (cells [34:33] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[31:30] == 2'b10) && (cells [34:33] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[34:33] = cells[31:30];
-								cells[31:30] = 2'b00; // fg is now black
-							end
-							if (player_input == UP) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[31:30] == 2'b01) && (cells [19:18] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[31:30] == 2'b10) && (cells [19:18] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[19:18] = cells[31:30];
-								cells[31:30] = 2'b00; // fg is now black
-							end
-							if (player_input == LEFT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[31:30] == 2'b01) && (cells [28:27] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[31:30] == 2'b10) && (cells [28:27] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[28:27] = cells[31:30];
-								cells[31:30] = 2'b00; // fg is now black
-							end
-						end
-						else
-							selector_x = 1;
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			LOGIC_4: begin
+				// If there is a piece on that cell
+				if (((cells[13:12] == 2'b10) && (player_turn == 1'b0)) || ((cells[13:12] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == DOWN) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[13:12] == 2'b01) && (cells [25:24] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[13:12] == 2'b10) && (cells [25:24] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[25:24] = cells[13:12];
+						cells[13:12] = 2'b11; // fg is now white
 					end
-					
-					// 11 White
-					4'b1011: begin
-						// If there is a piece on that cell
-						if (((cells[34:33] == 2'b10) && (player_turn == 0)) || ((cells[34:33] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == DOWN) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[34:33] == 2'b01) && (cells [46:45] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[34:33] == 2'b10) && (cells [46:45] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[46:45] = cells[34:33];
-								cells[34:33] = 2'b11; // fg is now white
-							end
-							if (player_input == UP) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[34:33] == 2'b01) && (cells [22:21] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[34:33] == 2'b10) && (cells [22:21] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[22:21] = cells[34:33];
-								cells[34:33] = 2'b11; // fg is now white
-							end
-							if (player_input == LEFT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[34:33] == 2'b01) && (cells [31:30] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[34:33] == 2'b10) && (cells [31:30] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[31:30] = cells[34:33];
-								cells[34:33] = 2'b11; // fg is now white
-							end
-						end
-						else
-							selector_x = 1;
+					else if (player_input == RIGHT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[13:12] == 2'b01) && (cells [16:15] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[13:12] == 2'b10) && (cells [16:15] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[16:15] = cells[13:12];
+						cells[13:12] = 2'b11; // fg is now white
 					end
-					
-					// ROW 3
-					// 12 White
-					4'b1100: begin
-						// If there is a piece on that cell
-						if (((cells[37:36] == 2'b10) && (player_turn == 0)) || ((cells[37:36] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == UP) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[37:36] == 2'b01) && (cells [25:24] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[37:36] == 2'b10) && (cells [25:24] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[25:24] = cells[37:36];
-								cells[37:36] = 2'b11; // fg is now white
-							end
-							if (player_input == RIGHT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[37:36] == 2'b01) && (cells [40:39] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[37:36] == 2'b10) && (cells [40:39] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[40:39] = cells[37:36];
-								cells[37:36] = 2'b11; // fg is now white
-							end
-						end
-						else
-							selector_x = 1;
+					else if (player_input == UP) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[13:12] == 2'b01) && (cells [1:0] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[13:12] == 2'b10) && (cells [1:0] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[1:0] = cells[13:12];
+						cells[13:12] = 2'b11; // fg is now white
 					end
-					
-					// 13 Black
-					4'b1101: begin
-						// If there is a piece on that cell
-						if (((cells[40:39] == 2'b10) && (player_turn == 0)) || ((cells[40:39] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == RIGHT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[40:39] == 2'b01) && (cells [43:42] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[40:39] == 2'b10) && (cells [43:42] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[43:42] = cells[40:39];
-								cells[40:39] = 2'b00; // fg is now black
-							end
-							if (player_input == UP) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[40:39] == 2'b01) && (cells [28:27] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[40:39] == 2'b10) && (cells [28:27] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[28:27] = cells[40:39];
-								cells[40:39] = 2'b00; // fg is now black
-							end
-							if (player_input == LEFT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[40:39] == 2'b01) && (cells [37:36] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[40:39] == 2'b10) && (cells [37:36] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[37:36] = cells[40:39];
-								cells[40:39] = 2'b00; // fg is now black
-							end
-						end
-						else
-							selector_x = 1;
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			LOGIC_5: begin
+				// If there is a piece on that cell
+				if (((cells[16:15] == 2'b10) && (player_turn == 1'b0)) || ((cells[16:15] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == DOWN) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[16:15] == 2'b01) && (cells [28:27] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[16:15] == 2'b10) && (cells [28:27] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[28:27] = cells[16:15];
+						cells[16:15] = 2'b00; // fg is now black
 					end
-					
-					// 14 White
-					4'b1110: begin
-						// If there is a piece on that cell
-						if (((cells[43:42] == 2'b10) && (player_turn == 0)) || ((cells[43:42] == 2'b01) && (player_turn = 1))) begin
-							if (player_input == UP) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[43:42] == 2'b01) && (cells [31:30] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[43:42] == 2'b10) && (cells [31:30] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[31:30] = cells[43:42];
-								cells[43:42] = 2'b11; // fg is now white
-							end
-							if (player_input == RIGHT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[43:42] == 2'b01) && (cells [46:45] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[43:42] == 2'b10) && (cells [46:45] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[46:45] = cells[43:42];
-								cells[43:42] = 2'b11; // fg is now white
-							end
-							if (player_input == LEFT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[43:42] == 2'b01) && (cells [40:39] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[43:42] == 2'b10) && (cells [40:39] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[40:39] = cells[43:42];
-								cells[43:42] = 2'b11; // fg is now white
-							end
-						end
-						else
-							selector_x = 1;
+					else if (player_input == RIGHT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[16:15] == 2'b01) && (cells [19:18] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[16:15] == 2'b10) && (cells [19:18] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[19:18] = cells[16:15];
+						cells[16:15] = 2'b00; // fg is now black
 					end
-					
-					// 15 Black
-					4'b1111: begin
-						// If there is a piece on that cell
-						if (((cells[46:45] == 2'b10) && (player_turn == 0)) || ((cells[46:45] == 2'b01) && (player_turn = 1))) begin
-							if (player_input== LEFT) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[46:45] == 2'b01) && (cells [43:42] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[46:45] == 2'b10) && (cells [43:42] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[43:42] = cells[46:45];
-								cells[46:45] = 2'b00; // fg is now black
-							end
-							if (player_input == UP) begin
-								// if there is a blue piece killing a yellow piece
-								if ((cells[46:45] == 2'b01) && (cells [34:33] == 2'b10)) score_b <= score_b + 5'b00001;
-								// if there is a yellow piece killing a blue piece
-								if ((cells[46:45] == 2'b10) && (cells [34:33] == 2'b01)) score_y <= score_y + 5'b00001;
-								cells[34:33] = cells[46:45];
-								cells[46:45] = 2'b00; // fg is now black
-							end
-						end
-						else
-							selector_x = 1;
+					else if (player_input == LEFT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[16:15] == 2'b01) && (cells [13:12] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[16:15] == 2'b10) && (cells [13:12] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[13:12] = cells[16:15];
+						cells[16:15] = 2'b00; // fg is now black
 					end
-					
-				endcase
-				
-				// Swtich the player turn as long as it was a valid turn.
-				if (selector_x == 0) begin
-					if (player_turn == 0) player_turn = 1;
-					else player_turn = 0;
+					else if (player_input == UP) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[16:15] == 2'b01) && (cells [4:3] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[16:15] == 2'b10) && (cells [4:3] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[4:3] = cells[16:15];
+						cells[16:15] = 2'b00; // fg is now black
+					end
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			LOGIC_6: begin
+				// If there is a piece on that cell
+				if (((cells[19:18] == 2'b10) && (player_turn == 1'b0)) || ((cells[19:18] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == DOWN) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[19:18] == 2'b01) && (cells [31:30] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[19:18] == 2'b10) && (cells [31:30] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[31:30] = cells[19:18];
+						cells[19:18] = 2'b11; // fg is now white
+					end
+					else if (player_input == RIGHT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[19:18] == 2'b01) && (cells [22:21] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[19:18] == 2'b10) && (cells [22:21] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[22:21] = cells[19:18];
+						cells[19:18] = 2'b11; // fg is now white
+					end
+					else if (player_input == UP) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[19:18] == 2'b01) && (cells [7:6] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[19:18] == 2'b10) && (cells [7:6] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[7:6] = cells[19:18];
+						cells[19:18] = 2'b11; // fg is now white
+					end
+					else if (player_input == LEFT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[19:18] == 2'b01) && (cells [16:15] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[19:18] == 2'b10) && (cells [16:15] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[16:15] = cells[19:18];
+						cells[19:18] = 2'b11; // fg is now white
+					end
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			LOGIC_7: begin
+				// If there is a piece on that cell
+				if (((cells[22:21] == 2'b10) && (player_turn == 1'b0)) || ((cells[22:21] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == DOWN) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[22:21] == 2'b01) && (cells [34:33] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[22:21] == 2'b10) && (cells [34:33] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[34:33] = cells[22:21];
+						cells[22:21] = 2'b00; // fg is now black
+					end
+					else if (player_input == LEFT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[22:21] == 2'b01) && (cells [19:18] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[22:21] == 2'b10) && (cells [19:18] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[19:18] = cells[22:21];
+						cells[22:21] = 2'b00; // fg is now black
+					end
+					else if (player_input == UP) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[22:21] == 2'b01) && (cells [10:9] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[22:21] == 2'b10) && (cells [10:9] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[10:9] = cells[22:21];
+						cells[22:21] = 2'b00; // fg is now black
+					end
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			LOGIC_8: begin
+				// If there is a piece on that cell
+				if (((cells[25:24] == 2'b10) && (player_turn == 1'b0)) || ((cells[25:24] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == DOWN) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[25:24] == 2'b01) && (cells [37:36] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[25:24] == 2'b10) && (cells [37:36] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[37:36] = cells[25:24];
+						cells[25:24] = 2'b00; // fg is now black
+					end
+					else if (player_input == RIGHT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[25:24] == 2'b01) && (cells [28:27] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[25:24] == 2'b10) && (cells [28:27] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[28:27] = cells[25:24];
+						cells[25:24] = 2'b00; // fg is now black
+					end
+					else if (player_input == UP) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[25:24] == 2'b01) && (cells [13:12] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[25:24] == 2'b10) && (cells [13:12] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[13:12] = cells[25:24];
+						cells[25:24] = 2'b00; // fg is now black
+					end
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			LOGIC_9: begin
+				// If there is a piece on that cell
+				if (((cells[28:27] == 2'b10) && (player_turn == 1'b0)) || ((cells[28:27] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == DOWN) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[28:27] == 2'b01) && (cells [40:39] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[28:27] == 2'b10) && (cells [40:39] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[40:39] = cells[28:27];
+						cells[28:27] = 2'b11; // fg is now white
+					end
+					else if (player_input == RIGHT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[28:27] == 2'b01) && (cells [31:30] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[28:27] == 2'b10) && (cells [31:30] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[31:30] = cells[28:27];
+						cells[28:27] = 2'b11; // fg is now white
+					end
+					else if (player_input == UP) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[28:27] == 2'b01) && (cells [16:15] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[28:27] == 2'b10) && (cells [16:15] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[16:15] = cells[28:27];
+						cells[28:27] = 2'b11; // fg is now white
+					end
+					else if (player_input == LEFT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[28:27] == 2'b01) && (cells [25:24] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[28:27] == 2'b10) && (cells [25:24] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[25:24] = cells[28:27];
+						cells[28:27] = 2'b11; // fg is now white
+					end
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			LOGIC_10: begin
+				// If there is a piece on that cell
+				if (((cells[31:30] == 2'b10) && (player_turn == 1'b0)) || ((cells[31:30] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == DOWN) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[31:30] == 2'b01) && (cells [43:42] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[31:30] == 2'b10) && (cells [43:42] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[43:42] = cells[31:30];
+						cells[31:30] = 2'b00; // fg is now black
+					end
+					else if (player_input == RIGHT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[31:30] == 2'b01) && (cells [34:33] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[31:30] == 2'b10) && (cells [34:33] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[34:33] = cells[31:30];
+						cells[31:30] = 2'b00; // fg is now black
+					end
+					else if (player_input == UP) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[31:30] == 2'b01) && (cells [19:18] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[31:30] == 2'b10) && (cells [19:18] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[19:18] = cells[31:30];
+						cells[31:30] = 2'b00; // fg is now black
+					end
+					else if (player_input == LEFT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[31:30] == 2'b01) && (cells [28:27] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[31:30] == 2'b10) && (cells [28:27] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[28:27] = cells[31:30];
+						cells[31:30] = 2'b00; // fg is now black
+					end
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			LOGIC_11: begin
+				// If there is a piece on that cell
+				if (((cells[34:33] == 2'b10) && (player_turn == 1'b0)) || ((cells[34:33] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == DOWN) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[34:33] == 2'b01) && (cells [46:45] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[34:33] == 2'b10) && (cells [46:45] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[46:45] = cells[34:33];
+						cells[34:33] = 2'b11; // fg is now white
+					end
+					else if (player_input == UP) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[34:33] == 2'b01) && (cells [22:21] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[34:33] == 2'b10) && (cells [22:21] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[22:21] = cells[34:33];
+						cells[34:33] = 2'b11; // fg is now white
+					end
+					else if (player_input == LEFT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[34:33] == 2'b01) && (cells [31:30] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[34:33] == 2'b10) && (cells [31:30] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[31:30] = cells[34:33];
+						cells[34:33] = 2'b11; // fg is now white
+					end
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			LOGIC_12: begin
+				// If there is a piece on that cell
+				if (((cells[37:36] == 2'b10) && (player_turn == 1'b0)) || ((cells[37:36] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == UP) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[37:36] == 2'b01) && (cells [25:24] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[37:36] == 2'b10) && (cells [25:24] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[25:24] = cells[37:36];
+						cells[37:36] = 2'b11; // fg is now white
+					end
+					else if (player_input == RIGHT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[37:36] == 2'b01) && (cells [40:39] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[37:36] == 2'b10) && (cells [40:39] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[40:39] = cells[37:36];
+						cells[37:36] = 2'b11; // fg is now white
+					end
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			LOGIC_13: begin
+				// If there is a piece on that cell
+				if (((cells[40:39] == 2'b10) && (player_turn == 1'b0)) || ((cells[40:39] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == RIGHT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[40:39] == 2'b01) && (cells [43:42] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[40:39] == 2'b10) && (cells [43:42] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[43:42] = cells[40:39];
+						cells[40:39] = 2'b00; // fg is now black
+					end
+					else if (player_input == UP) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[40:39] == 2'b01) && (cells [28:27] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[40:39] == 2'b10) && (cells [28:27] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[28:27] = cells[40:39];
+						cells[40:39] = 2'b00; // fg is now black
+					end
+					else if (player_input == LEFT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[40:39] == 2'b01) && (cells [37:36] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[40:39] == 2'b10) && (cells [37:36] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[37:36] = cells[40:39];
+						cells[40:39] = 2'b00; // fg is now black
+					end
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			LOGIC_14: begin
+				// If there is a piece on that cell
+				if (((cells[43:42] == 2'b10) && (player_turn == 1'b0)) || ((cells[43:42] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input == UP) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[43:42] == 2'b01) && (cells [31:30] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[43:42] == 2'b10) && (cells [31:30] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[31:30] = cells[43:42];
+						cells[43:42] = 2'b11; // fg is now white
+					end
+					else if (player_input == RIGHT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[43:42] == 2'b01) && (cells [46:45] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[43:42] == 2'b10) && (cells [46:45] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[46:45] = cells[43:42];
+						cells[43:42] = 2'b11; // fg is now white
+					end
+					else if (player_input == LEFT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[43:42] == 2'b01) && (cells [40:39] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[43:42] == 2'b10) && (cells [40:39] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[40:39] = cells[43:42];
+						cells[43:42] = 2'b11; // fg is now white
+					end
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			LOGIC_15: begin
+				// If there is a piece on that cell
+				if (((cells[46:45] == 2'b10) && (player_turn == 1'b0)) || ((cells[46:45] == 2'b01) && (player_turn = 1'b1))) begin
+					selector_x <= 1'b0;
+					if (player_input== LEFT) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[46:45] == 2'b01) && (cells [43:42] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[46:45] == 2'b10) && (cells [43:42] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[43:42] = cells[46:45];
+						cells[46:45] = 2'b00; // fg is now black
+					end
+					else if (player_input == UP) begin
+						// if there is a blue piece killing a yellow piece
+						if ((cells[46:45] == 2'b01) && (cells [34:33] == 2'b10)) score_b <= score_b + 5'b00001;
+						// if there is a yellow piece killing a blue piece
+						if ((cells[46:45] == 2'b10) && (cells [34:33] == 2'b01)) score_y <= score_y + 5'b00001;
+						cells[34:33] = cells[46:45];
+						cells[46:45] = 2'b00; // fg is now black
+					end
+					else selector_x <= 1'b1;
+				end
+				else
+					selector_x <= 1'b1;
+			end
+			
+			CLEAN_UP: begin
+			// Swtich the player turn as long as it was a valid turn.
+				if (selector_x == 1'b0) begin
+					if (player_turn == 1'b0) player_turn <= 1'b1;
+					else player_turn <= 1'b0;
 				end
 			end
 
@@ -1348,6 +1458,7 @@ module game_controller_fsm (confirm, load_p, load_s, x_out, y_out, colour1_out, 
 		 // Should restart
 		curr_state <= next_state;
 		hex_state <= {2'b00, player_input};
+
 	end	
 
 endmodule
