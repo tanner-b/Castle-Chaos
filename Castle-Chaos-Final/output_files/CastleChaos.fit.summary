@@ -1,0 +1,16 @@
+Fitter Status : Successful - Thu Apr  4 15:25:17 2019
+Quartus Prime Version : 16.0.0 Build 211 04/27/2016 SJ Lite Edition
+Revision Name : CastleChaos
+Top-level Entity Name : CastleChaos
+Family : Cyclone IV E
+Device : EP4CE115F29C7
+Timing Models : Final
+Total logic elements : 974 / 114,480 ( < 1 % )
+    Total combinational functions : 962 / 114,480 ( < 1 % )
+    Dedicated logic registers : 225 / 114,480 ( < 1 % )
+Total registers : 243
+Total pins : 114 / 529 ( 22 % )
+Total virtual pins : 0
+Total memory bits : 57,600 / 3,981,312 ( 1 % )
+Embedded Multiplier 9-bit elements : 0 / 532 ( 0 % )
+Total PLLs : 1 / 4 ( 25 % )

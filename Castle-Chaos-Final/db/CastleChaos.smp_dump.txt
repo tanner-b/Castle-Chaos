@@ -1,0 +1,59 @@
+
+State Machine - |CastleChaos|game_controller_fsm:main|curr_state
+Name curr_state.CLEAN_UP curr_state.DO_LOGIC curr_state.WAIT_PLAYER_UP curr_state.WAIT_PLAYER curr_state.WAIT_SELECTOR_DONE curr_state.DRAW_SELECTOR curr_state.WAIT_BOARD_15 curr_state.DRAW_BOARD_15 curr_state.WAIT_BOARD_14 curr_state.DRAW_BOARD_14 curr_state.WAIT_BOARD_13 curr_state.DRAW_BOARD_13 curr_state.WAIT_BOARD_12 curr_state.DRAW_BOARD_12 curr_state.WAIT_BOARD_11 curr_state.DRAW_BOARD_11 curr_state.WAIT_BOARD_10 curr_state.DRAW_BOARD_10 curr_state.WAIT_BOARD_9 curr_state.DRAW_BOARD_9 curr_state.WAIT_BOARD_8 curr_state.DRAW_BOARD_8 curr_state.WAIT_BOARD_7 curr_state.DRAW_BOARD_7 curr_state.WAIT_BOARD_6 curr_state.DRAW_BOARD_6 curr_state.WAIT_BOARD_5 curr_state.DRAW_BOARD_5 curr_state.WAIT_BOARD_4 curr_state.DRAW_BOARD_4 curr_state.WAIT_BOARD_3 curr_state.DRAW_BOARD_3 curr_state.WAIT_BOARD_2 curr_state.DRAW_BOARD_2 curr_state.WAIT_BOARD_1 curr_state.DRAW_BOARD_1 curr_state.WAIT_BOARD_0 curr_state.DRAW_BOARD_0 curr_state.RESET 
+curr_state.RESET 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+curr_state.DRAW_BOARD_0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 
+curr_state.WAIT_BOARD_0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 1 
+curr_state.DRAW_BOARD_1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 1 
+curr_state.WAIT_BOARD_1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 1 
+curr_state.DRAW_BOARD_2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 1 
+curr_state.WAIT_BOARD_2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 
+curr_state.DRAW_BOARD_3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 1 
+curr_state.WAIT_BOARD_3 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 1 
+curr_state.DRAW_BOARD_4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_BOARD_4 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 1 
+curr_state.DRAW_BOARD_5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_BOARD_5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.DRAW_BOARD_6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_BOARD_6 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.DRAW_BOARD_7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_BOARD_7 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.DRAW_BOARD_8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_BOARD_8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.DRAW_BOARD_9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_BOARD_9 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.DRAW_BOARD_10 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_BOARD_10 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.DRAW_BOARD_11 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_BOARD_11 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.DRAW_BOARD_12 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_BOARD_12 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.DRAW_BOARD_13 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_BOARD_13 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.DRAW_BOARD_14 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_BOARD_14 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.DRAW_BOARD_15 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_BOARD_15 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.DRAW_SELECTOR 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_SELECTOR_DONE 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_PLAYER 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.WAIT_PLAYER_UP 0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.DO_LOGIC 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+curr_state.CLEAN_UP 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 
+
+State Machine - |CastleChaos|Selector_Drawer_FSM:selector_drawer|curr_state
+Name curr_state.X_b curr_state.X_a curr_state.DONE curr_state.RIGHT_BOARDER curr_state.TOP_BOARDER curr_state.LEFT_BOARDER curr_state.BOTTOM_BOARDER curr_state.WAIT 
+curr_state.WAIT 0 0 0 0 0 0 0 0 
+curr_state.BOTTOM_BOARDER 0 0 0 0 0 0 1 1 
+curr_state.LEFT_BOARDER 0 0 0 0 0 1 0 1 
+curr_state.TOP_BOARDER 0 0 0 0 1 0 0 1 
+curr_state.RIGHT_BOARDER 0 0 0 1 0 0 0 1 
+curr_state.DONE 0 0 1 0 0 0 0 1 
+curr_state.X_a 0 1 0 0 0 0 0 1 
+curr_state.X_b 1 0 0 0 0 0 0 1 
+
+State Machine - |CastleChaos|Draw_Grid_FSM:grid_drawer|curr_state
+Name curr_state.INCREMENT curr_state.DONE curr_state.WAIT 
+curr_state.WAIT 0 0 0 
+curr_state.INCREMENT 1 0 1 
+curr_state.DONE 0 1 1 

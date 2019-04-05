@@ -1,0 +1,14 @@
+Analysis & Synthesis Status : Successful - Wed Mar 13 17:51:30 2019
+Quartus Prime Version : 16.1.0 Build 196 10/24/2016 SJ Lite Edition
+Revision Name : CastleChaos
+Top-level Entity Name : CastleChaos
+Family : Cyclone IV E
+Total logic elements : 80
+    Total combinational functions : 75
+    Dedicated logic registers : 30
+Total registers : 30
+Total pins : 58
+Total virtual pins : 0
+Total memory bits : 57,600
+Embedded Multiplier 9-bit elements : 0
+Total PLLs : 1
