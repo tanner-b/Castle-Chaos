@@ -110,7 +110,7 @@ endmodule
 	
 
 
-// https://electronics.stackexchange.com/questions/202876/how-can-i-generate-a-1-hz-clock-from-50-mhz-clock-coming-from-an-altera-board~~~~~~~~~~~~~~~~~~SOFIA
+// https://electronics.stackexchange.com/questions/202876/how-can-i-generate-a-1-hz-clock-from-50-mhz-clock-coming-from-an-altera-board
 module rate_dividor(clkin, clkout);
 	reg [24:0] counter = 4'b1010;
 	output reg clkout = 1'b0;
